@@ -1,0 +1,2 @@
+ALTER TABLE employees
+    ADD COLUMN IF NOT EXISTS site VARCHAR(200);
