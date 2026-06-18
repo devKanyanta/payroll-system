@@ -22,8 +22,8 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     const response = await authService.login({ email, password });
-    const { accessToken, refreshToken, role, firstName, lastName } = response.data;
-    const userData = { email, role, firstName, lastName };
+    const { accessToken, refreshToken, role, firstName, lastName, id } = response.data;
+    const userData = { id, email, role, firstName, lastName };
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
     localStorage.setItem('user', JSON.stringify(userData));

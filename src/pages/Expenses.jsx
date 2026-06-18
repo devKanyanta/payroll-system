@@ -24,6 +24,7 @@ export default function Expenses() {
   const [form, setForm] = useState(emptyExpense);
   const [deleteId, setDeleteId] = useState(null);
   const queryClient = useQueryClient();
+  const user = JSON.parse(localStorage.getItem('user')) || {};
 
   const { data: pageData, isLoading } = useQuery({
     queryKey: ['expenses', page, rowsPerPage, startDate, endDate],
@@ -63,7 +64,7 @@ export default function Expenses() {
   const closeDialog = () => { setDialogOpen(false); setEditId(null); setForm(emptyExpense); };
 
   const handleSubmit = () => {
-    const data = { ...form, amount: parseFloat(form.amount) };
+    const data = { ...form, amount: parseFloat(form.amount), createdBy: user  };
     if (editId) updateMutation.mutate(data);
     else createMutation.mutate(data);
   };

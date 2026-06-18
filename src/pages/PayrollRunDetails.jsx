@@ -41,6 +41,14 @@ export default function PayrollRunDetails() {
   const timeValuesRef = useRef({});
   const [savingEntries, setSavingEntries] = useState({});
 
+
+
+  const { data: run, isLoading } = useQuery({
+    queryKey: ['payroll-run', id],
+    queryFn: async () => { const res = await payrollRunService.getById(id); return res.data; },
+    enabled: !isNew,
+  });
+  
   // Initialize timeValues when entries load
   useEffect(() => {
     if (run?.payrollEntries) {
@@ -61,12 +69,6 @@ export default function PayrollRunDetails() {
     }
   }, [run?.payrollEntries]);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-
-  const { data: run, isLoading } = useQuery({
-    queryKey: ['payroll-run', id],
-    queryFn: async () => { const res = await payrollRunService.getById(id); return res.data; },
-    enabled: !isNew,
-  });
 
   const { data: availableEmployees } = useQuery({
     queryKey: ['available-employees', id],
