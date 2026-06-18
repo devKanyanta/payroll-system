@@ -63,6 +63,7 @@ public class AuthServiceImpl implements AuthService {
             refreshTokenRepository.save(tokenEntity);
 
             return AuthResponse.builder()
+                    .id(user.getId())
                     .accessToken(accessToken)
                     .refreshToken(refreshToken)
                     .email(user.getEmail())

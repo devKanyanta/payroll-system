@@ -1,5 +1,7 @@
 package com.payroll.dto;
 
+import java.util.UUID;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -8,6 +10,7 @@ import lombok.Data;
 @Builder
 @AllArgsConstructor
 public class AuthResponse {
+    private UUID id;
     private String accessToken;
     private String refreshToken;
     private String tokenType = "Bearer";
@@ -16,7 +19,8 @@ public class AuthResponse {
     private String firstName;
     private String lastName;
 
-    public AuthResponse(String accessToken, String refreshToken, String email, String role, String firstName, String lastName) {
+    public AuthResponse(UUID id, String accessToken, String refreshToken, String email, String role, String firstName, String lastName) {
+        this.id = id;
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
         this.tokenType = "Bearer";
