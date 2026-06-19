@@ -23,7 +23,7 @@ const emptyEmployee = {
   firstName: '', lastName: '', email: '', phone: '', nrc: '',
   departmentId: '', position: '', site: '', employmentType: 'FULL_TIME',
   salaryType: 'MONTHLY', bankName: '', accountNumber: '',
-  dateHired: '', basicSalary: '', status: 'ACTIVE', employeeNumber: '',
+  dateHired: '', rate: '', status: 'ACTIVE', employeeNumber: '',
 };
 
 export default function Employees() {
@@ -95,7 +95,7 @@ export default function Employees() {
       position: emp.position || '', site: emp.site || '', employmentType: emp.employmentType,
       salaryType: emp.salaryType, bankName: emp.bankName || '',
       accountNumber: emp.accountNumber || '',
-      dateHired: emp.dateHired, basicSalary: emp.basicSalary,
+      dateHired: emp.dateHired, rate: emp.rate || '',
       status: emp.status, employeeNumber: emp.employeeNumber,
     });
     setErrors({});
@@ -107,7 +107,7 @@ export default function Employees() {
   const handleSubmit = () => {
     const data = {
       ...form,
-      basicSalary: parseFloat(form.basicSalary) || 0,
+      rate: parseFloat(form.rate) || null,
     };
     if (editId) {
       updateMutation.mutate(data);
@@ -182,7 +182,7 @@ export default function Employees() {
                 <TableCell>Email</TableCell>
                 <TableCell>Department</TableCell>
                 <TableCell>Position</TableCell>
-                <TableCell>Salary</TableCell>
+                <TableCell>Rate/Hr</TableCell>
                 <TableCell>Status</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
@@ -203,7 +203,7 @@ export default function Employees() {
                     <TableCell onClick={() => navigate(`/employees/${emp.id}`)}>{emp.departmentName || '-'}</TableCell>
                     <TableCell onClick={() => navigate(`/employees/${emp.id}`)}>{emp.position || '-'}</TableCell>
                     <TableCell onClick={() => navigate(`/employees/${emp.id}`)}>
-                      ZMW {emp.basicSalary?.toLocaleString()}
+                      ZMW {emp.rate?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '-'}
                     </TableCell>
                     <TableCell>
                       <Chip label={emp.status} color={statusColors[emp.status] || 'default'} size="small" />
@@ -298,8 +298,8 @@ export default function Employees() {
               </FormControl>
             </Grid>
             <Grid item xs={12} sm={4}>
-              <TextField fullWidth label="Basic Salary *" type="number" value={form.basicSalary} onChange={handleChange('basicSalary')}
-                helperText={errors.basicSalary} error={!!errors.basicSalary} required />
+              <TextField fullWidth label="Rate/Hr *" type="number" value={form.rate} onChange={handleChange('rate')}
+                helperText={errors.rate || 'Hourly rate (matches RATE/HRS in Excel template)'} error={!!errors.rate} required />
             </Grid>
             <Grid item xs={12} sm={4}>
               <TextField fullWidth label="Date Hired *" type="date" value={form.dateHired} onChange={handleChange('dateHired')}

@@ -122,6 +122,7 @@ export default function EmployeeDetails() {
                 <DetailRow label="Site" value={employee.site || '-'} />
                 <DetailRow label="Employment Type" value={employee.employmentType?.replace('_', ' ') || '-'} />
                 <DetailRow label="Salary Type" value={employee.salaryType || '-'} />
+                <DetailRow label="Rate/Hr" value={employee.rate ? `ZMW ${employee.rate.toLocaleString(undefined, {minimumFractionDigits: 2})}` : '-'} />
 
                 <Divider sx={{ my: 1.5 }} />
 
@@ -133,9 +134,14 @@ export default function EmployeeDetails() {
 
                 <Divider sx={{ my: 1.5 }} />
 
-                <Box sx={{ bgcolor: 'primary.main', color: 'white', borderRadius: 1, p: 2, textAlign: 'center' }}>
-                  <Typography variant="caption" sx={{ opacity: 0.8 }}>Basic Salary</Typography>
-                  <Typography variant="h5" fontWeight={700}>ZMW {employee.basicSalary?.toLocaleString()}</Typography>
+                <Box sx={{ bgcolor: 'primary.main', color: 'white', borderRadius: 1, p: 2, textAlign: 'center', mb: 1 }}>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>Rate / Hr</Typography>
+                  <Typography variant="h5" fontWeight={700}>
+                    ZMW {employee.rate?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '-'}
+                  </Typography>
+                  <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                    Hourly rate (RATE/HRS from template)
+                  </Typography>
                 </Box>
 
                 {/* Active Loan Summary */}

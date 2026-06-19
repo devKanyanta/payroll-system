@@ -101,6 +101,8 @@ export default function PayrollRuns() {
               <TableRow>
                 <TableCell>Period</TableCell>
                 <TableCell>Status</TableCell>
+                <TableCell>Employees</TableCell>
+                <TableCell align="right">Total Net Pay</TableCell>
                 <TableCell>Created By</TableCell>
                 <TableCell>Approved By</TableCell>
                 <TableCell>Created</TableCell>
@@ -109,7 +111,7 @@ export default function PayrollRuns() {
             </TableHead>
             <TableBody>
               {pageData?.content?.length === 0 ? (
-                <TableRow><TableCell colSpan={6} align="center">No payroll runs found</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} align="center">No payroll runs found</TableCell></TableRow>
               ) : (
                 pageData?.content?.map((run) => (
                   <TableRow key={run.id} hover sx={{ cursor: 'pointer' }}>
@@ -120,6 +122,14 @@ export default function PayrollRuns() {
                     </TableCell>
                     <TableCell onClick={() => navigate(`/payroll-runs/${run.id}`)}>
                       <Chip label={run.status} size="small" color={statusColors[run.status] || 'default'} />
+                    </TableCell>
+                    <TableCell onClick={() => navigate(`/payroll-runs/${run.id}`)}>
+                      {run.entryCount ?? '-'}
+                    </TableCell>
+                    <TableCell align="right" onClick={() => navigate(`/payroll-runs/${run.id}`)}>
+                      <Typography variant="body2" fontWeight={600}>
+                        ZMW {(run.totalNetPay ?? 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                      </Typography>
                     </TableCell>
                     <TableCell onClick={() => navigate(`/payroll-runs/${run.id}`)}>
                       {run.createdBy?.email || '-'}
