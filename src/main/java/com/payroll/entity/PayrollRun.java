@@ -3,7 +3,7 @@ package com.payroll.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
-import java.util.UUID;
+import java.util.*;
 
 @Entity
 @Table(name = "payroll_runs")
@@ -61,6 +61,21 @@ public class PayrollRun {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "payrollRun", fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties("payrollRun")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @Builder.Default
+    private List<PayrollEntry> payrollEntries = new ArrayList<>();
+
+    @Transient
+    @Builder.Default
+    private Integer entryCount = 0;
+
+    @Transient
+    @Builder.Default
+    private java.math.BigDecimal totalNetPay = java.math.BigDecimal.ZERO;
 
     @PrePersist
     protected void onCreate() {

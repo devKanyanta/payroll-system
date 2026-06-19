@@ -19,10 +19,7 @@ public class PayrollCalculationServiceImpl implements PayrollCalculationService 
                                                BigDecimal overtimeHours, BigDecimal holidayHours,
                                                List<Loan> activeLoans, BigDecimal otherDeductions,
                                                BigDecimal presentDays) {
-        BigDecimal hourlyRate = calculateHourlyRate(
-                employee.getBasicSalary(),
-                settings.getWorkingDaysPerMonth(),
-                settings.getHoursPerDay());
+        BigDecimal hourlyRate = employee.getRate() != null ? employee.getRate() : BigDecimal.ZERO;
         if (presentDays == null) presentDays = BigDecimal.ZERO;
         if (overtimeHours == null) overtimeHours = BigDecimal.ZERO;
         if (holidayHours == null) holidayHours = BigDecimal.ZERO;
@@ -48,8 +45,12 @@ public class PayrollCalculationServiceImpl implements PayrollCalculationService 
 
         BigDecimal netSalary = calculateNetSalary(grossSalary, nhima, napsa, softloanDeduction);
 
+        // Calculate monthly-equivalent salary from hourly rate for historical record
+        BigDecimal monthlyEquivalent = hourlyRate.multiply(
+                BigDecimal.valueOf(settings.getHoursPerDay() * settings.getWorkingDaysPerMonth()));
+
         return PayrollEntry.builder()
-                .basicSalary(employee.getBasicSalary())
+                .basicSalary(monthlyEquivalent)
                 .hourlyRate(hourlyRate)
                 .presentDays(presentDays)
                 .loanBalance(loanBalance)
@@ -68,13 +69,6 @@ public class PayrollCalculationServiceImpl implements PayrollCalculationService 
                 .otherDeductions(otherDeductions)
                 .netSalary(netSalary)
                 .build();
-    }
-
-    @Override
-    public BigDecimal calculateHourlyRate(BigDecimal basicSalary, int workingDays, int hoursPerDay) {
-        BigDecimal monthlyHours = BigDecimal.valueOf(workingDays * hoursPerDay);
-        if (monthlyHours.compareTo(BigDecimal.ZERO) == 0) return BigDecimal.ZERO;
-        return basicSalary.divide(monthlyHours, 4, RoundingMode.HALF_UP);
     }
 
     @Override

@@ -6,8 +6,7 @@ import com.payroll.exception.BadRequestException;
 import com.payroll.exception.BusinessRuleException;
 import com.payroll.exception.ResourceNotFoundException;
 import com.payroll.repository.*;
-import com.payroll.service.PayrollCalculationService;
-import com.payroll.service.PayrollRunService;
+import com.payroll.service.*;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -34,17 +33,137 @@ public class PayrollRunServiceImpl implements PayrollRunService {
     private final PayrollSettingsRepository payrollSettingsRepository;
     private final LoanRepository loanRepository;
     private final PayrollCalculationService payrollCalculationService;
+    private final PayslipService payslipService;
+    private final NotificationService notificationService;
+    private final AuditService auditService;
+    private final EmployeeDeductionRepository employeeDeductionRepository;
+    private final DeductionTypeRepository deductionTypeRepository;
+
+    // ====================== Validation ======================
+
+    @Override
+    public List<Map<String, String>> validateBeforeSubmit(UUID runId) {
+        PayrollRun payrollRun = payrollRunRepository.findById(runId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayrollRun", runId));
+
+        PayrollSettings settings = payrollSettingsRepository
+                .findTopByEffectiveDateLessThanEqualOrderByEffectiveDateDesc(LocalDate.now())
+                .orElse(null);
+
+        int maxWorkingDays = settings != null ? settings.getWorkingDaysPerMonth() : 22;
+
+        List<PayrollEntry> entries = payrollEntryRepository.findByPayrollRunId(runId);
+        List<Map<String, String>> errors = new ArrayList<>();
+
+        // Rule 1: At least 1 employee entry
+        if (entries.isEmpty()) {
+            errors.add(Map.of(
+                    "field", "entries",
+                    "message", "Cannot submit an empty payroll run. Add at least one employee."
+            ));
+            return errors; // No point checking further
+        }
+
+        for (PayrollEntry entry : entries) {
+            Employee emp = entry.getEmployee();
+            String empName = emp.getFirstName() + " " + emp.getLastName();
+
+            // Rule 2: All employees are active
+            if (emp.getStatus() != EmployeeStatus.ACTIVE) {
+                errors.add(Map.of(
+                        "employeeName", empName,
+                        "field", "status",
+                        "message", empName + " is no longer active. Remove or update before submitting."
+                ));
+            }
+
+            // Rule 3: Present days > 0
+            if (entry.getPresentDays() == null || entry.getPresentDays().compareTo(BigDecimal.ZERO) <= 0) {
+                errors.add(Map.of(
+                        "employeeName", empName,
+                        "field", "presentDays",
+                        "message", empName + " has 0 present days. All employees must have present days > 0."
+                ));
+            }
+
+            // Rule 4: Present days ≤ working days per month
+            if (entry.getPresentDays() != null && entry.getPresentDays().compareTo(BigDecimal.valueOf(maxWorkingDays)) > 0) {
+                errors.add(Map.of(
+                        "employeeName", empName,
+                        "field", "presentDays",
+                        "message", empName + " has " + entry.getPresentDays().stripTrailingZeros().toPlainString()
+                                + " present days, exceeding the maximum of " + maxWorkingDays + "."
+                ));
+            }
+
+            // Rule 5: Overtime hours ≥ 0
+            if (entry.getOvertimeHours() != null && entry.getOvertimeHours().compareTo(BigDecimal.ZERO) < 0) {
+                errors.add(Map.of(
+                        "employeeName", empName,
+                        "field", "overtimeHours",
+                        "message", "Overtime hours cannot be negative for " + empName + "."
+                ));
+            }
+
+            // Rule 6: Holiday hours ≥ 0
+            if (entry.getHolidayHours() != null && entry.getHolidayHours().compareTo(BigDecimal.ZERO) < 0) {
+                errors.add(Map.of(
+                        "employeeName", empName,
+                        "field", "holidayHours",
+                        "message", "Holiday hours cannot be negative for " + empName + "."
+                ));
+            }
+
+            // Rule 7: Net salary ≥ 0
+            if (entry.getNetSalary() != null && entry.getNetSalary().compareTo(BigDecimal.ZERO) < 0) {
+                errors.add(Map.of(
+                        "employeeName", empName,
+                        "field", "netSalary",
+                        "message", "Net salary for " + empName + " is negative. Verify deductions."
+                ));
+            }
+        }
+
+        return errors;
+    }
+
+    // ====================== CRUD ======================
 
     @Override
     public PagedResponse<PayrollRun> getAllPayrollRuns(Integer month, Integer year, PayrollRunStatus status, Pageable pageable) {
         var page = payrollRunRepository.searchPayrollRuns(month, year, status, pageable);
+
+        // Populate transient fields: entryCount and totalNetPay
+        for (PayrollRun run : page.getContent()) {
+            List<PayrollEntry> entries = payrollEntryRepository.findByPayrollRunId(run.getId());
+            run.setEntryCount(entries.size());
+            BigDecimal totalNetPay = BigDecimal.ZERO;
+            for (PayrollEntry entry : entries) {
+                if (entry.getNetSalary() != null) {
+                    totalNetPay = totalNetPay.add(entry.getNetSalary());
+                }
+            }
+            run.setTotalNetPay(totalNetPay);
+        }
+
         return PagedResponse.from(page);
     }
 
     @Override
     public PayrollRun getPayrollRunById(UUID id) {
-        return payrollRunRepository.findById(id)
+        PayrollRun run = payrollRunRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PayrollRun", id));
+
+        // Fetch and populate entries for the detail view
+        List<PayrollEntry> entries = payrollEntryRepository.findByPayrollRunId(id);
+        // Eagerly load employeeDeductions for each entry
+        for (PayrollEntry entry : entries) {
+            List<EmployeeDeduction> deductions = employeeDeductionRepository.findByPayrollEntryId(entry.getId());
+            entry.setEmployeeDeductions(deductions);
+        }
+        run.setPayrollEntries(entries);
+
+        return run;
     }
 
     @Override
@@ -64,8 +183,15 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                 .createdBy(user)
                 .build();
 
-        return payrollRunRepository.save(payrollRun);
+        PayrollRun saved = payrollRunRepository.save(payrollRun);
+
+        auditService.logEvent(userId, "CREATE", "PayrollRun", saved.getId().toString(),
+                null, String.format("Payroll run created for %d/%d", month, year), null);
+
+        return saved;
     }
+
+    // ====================== Status Transitions ======================
 
     @Override
     @Transactional
@@ -77,8 +203,42 @@ public class PayrollRunServiceImpl implements PayrollRunService {
             throw new BusinessRuleException("Only DRAFT payroll runs can be submitted");
         }
 
+        // Run validation
+        List<Map<String, String>> validationErrors = validateBeforeSubmit(id);
+        if (!validationErrors.isEmpty()) {
+            throw new BusinessRuleException("Validation failed: " + validationErrors.size() + " error(s) found. Fix before submitting.");
+        }
+
+        User submitter = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
         payrollRun.setStatus(PayrollRunStatus.SUBMITTED);
-        return payrollRunRepository.save(payrollRun);
+        PayrollRun saved = payrollRunRepository.save(payrollRun);
+
+        auditService.logEvent(userId, "SUBMIT", "PayrollRun", saved.getId().toString(),
+                "DRAFT", "SUBMITTED", null);
+
+        // Notify all MANAGER users
+        List<User> managers = userRepository.findByRole(Role.MANAGER);
+        String monthName = getMonthName(payrollRun.getMonth());
+        String title = "Payroll Submitted";
+        String message = submitter.getFirstName() + " " + submitter.getLastName()
+                + " submitted " + monthName + " " + payrollRun.getYear() + " payroll for approval.";
+        String link = "/payroll-runs/" + saved.getId();
+
+        for (User manager : managers) {
+            notificationService.createNotification(manager.getId(), title, message, "PAYROLL", link);
+        }
+
+        // Also notify ADMIN users
+        List<User> admins = userRepository.findByRole(Role.ADMIN);
+        for (User admin : admins) {
+            if (!admin.getId().equals(userId)) { // Don't notify self
+                notificationService.createNotification(admin.getId(), title, message, "PAYROLL", link);
+            }
+        }
+
+        return saved;
     }
 
     @Override
@@ -94,10 +254,49 @@ public class PayrollRunServiceImpl implements PayrollRunService {
         User approver = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
+        // Separation of duties: submitter cannot approve
+        if (payrollRun.getCreatedBy().getId().equals(userId)) {
+            throw new BusinessRuleException("You cannot approve a payroll run that you submitted.");
+        }
+
         payrollRun.setStatus(PayrollRunStatus.APPROVED);
         payrollRun.setApprovedBy(approver);
         payrollRun.setApprovedAt(LocalDateTime.now());
-        return payrollRunRepository.save(payrollRun);
+        PayrollRun saved = payrollRunRepository.save(payrollRun);
+
+        auditService.logEvent(userId, "APPROVE", "PayrollRun", saved.getId().toString(),
+                "SUBMITTED", "APPROVED", null);
+
+        // Auto-generate payslips
+        try {
+            payslipService.generatePayslips(id);
+        } catch (Exception e) {
+            // Log but don't fail the approval — payslips can be regenerated manually
+            auditService.logEvent(userId, "ERROR", "PayslipGeneration", id.toString(),
+                    null, "Failed to auto-generate payslips: " + e.getMessage(), null);
+        }
+
+        // Notify the submitter
+        String monthName = getMonthName(payrollRun.getMonth());
+        String title = "Payroll Approved";
+        String message = approver.getFirstName() + " " + approver.getLastName()
+                + " approved " + monthName + " " + payrollRun.getYear() + " payroll.";
+        String link = "/payroll-runs/" + saved.getId();
+
+        User submitter = payrollRun.getCreatedBy();
+        notificationService.createNotification(submitter.getId(), title, message, "PAYROLL", link);
+
+        // Notify HR users
+        List<User> hrUsers = userRepository.findByRole(Role.HR);
+        for (User hr : hrUsers) {
+            if (!hr.getId().equals(submitter.getId())) {
+                notificationService.createNotification(hr.getId(), title,
+                        "Payroll for " + monthName + " " + payrollRun.getYear() + " has been approved. Payslips are being generated.",
+                        "PAYROLL", link);
+            }
+        }
+
+        return saved;
     }
 
     @Override
@@ -117,7 +316,23 @@ public class PayrollRunServiceImpl implements PayrollRunService {
         payrollRun.setRejectedBy(rejector);
         payrollRun.setRejectedAt(LocalDateTime.now());
         payrollRun.setRejectionReason(reason);
-        return payrollRunRepository.save(payrollRun);
+        PayrollRun saved = payrollRunRepository.save(payrollRun);
+
+        auditService.logEvent(userId, "REJECT", "PayrollRun", saved.getId().toString(),
+                "SUBMITTED", "REJECTED: " + reason, null);
+
+        // Notify the submitter
+        String monthName = getMonthName(payrollRun.getMonth());
+        String title = "Payroll Rejected";
+        String message = rejector.getFirstName() + " " + rejector.getLastName()
+                + " rejected " + monthName + " " + payrollRun.getYear()
+                + " payroll. Reason: " + reason;
+        String link = "/payroll-runs/" + saved.getId();
+
+        User submitter = payrollRun.getCreatedBy();
+        notificationService.createNotification(submitter.getId(), title, message, "PAYROLL", link);
+
+        return saved;
     }
 
     @Override
@@ -126,16 +341,40 @@ public class PayrollRunServiceImpl implements PayrollRunService {
         PayrollRun payrollRun = payrollRunRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PayrollRun", id));
 
-        if (payrollRun.getStatus() != PayrollRunStatus.REJECTED) {
-            throw new BusinessRuleException("Only REJECTED payroll runs can be reopened");
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+        // REJECTED runs can be reopened by HR/ADMIN; APPROVED runs can only be reopened by ADMIN
+        if (payrollRun.getStatus() == PayrollRunStatus.APPROVED && user.getRole() != Role.ADMIN) {
+            throw new BusinessRuleException("Only ADMIN users can reopen approved payroll runs.");
         }
+
+        if (payrollRun.getStatus() != PayrollRunStatus.REJECTED && payrollRun.getStatus() != PayrollRunStatus.APPROVED) {
+            throw new BusinessRuleException("Only REJECTED or APPROVED payroll runs can be reopened.");
+        }
+
+        String oldStatus = payrollRun.getStatus().name();
 
         payrollRun.setStatus(PayrollRunStatus.DRAFT);
         payrollRun.setRejectedBy(null);
         payrollRun.setRejectedAt(null);
         payrollRun.setRejectionReason(null);
-        return payrollRunRepository.save(payrollRun);
+        payrollRun.setApprovedBy(null);
+        payrollRun.setApprovedAt(null);
+        PayrollRun saved = payrollRunRepository.save(payrollRun);
+
+        auditService.logEvent(userId, "REOPEN", "PayrollRun", saved.getId().toString(),
+                oldStatus, "DRAFT", null);
+
+        // If reopening from APPROVED, invalidate existing payslips
+        if ("APPROVED".equals(oldStatus)) {
+            payslipService.invalidatePayslipsForRun(id);
+        }
+
+        return saved;
     }
+
+    // ====================== Employee Management ======================
 
     @Override
     @Transactional
@@ -183,7 +422,10 @@ public class PayrollRunServiceImpl implements PayrollRunService {
             entry.setPayrollRun(payrollRun);
             entry.setEmployee(employee);
 
-            createdEntries.add(payrollEntryRepository.save(entry));
+            PayrollEntry saved = payrollEntryRepository.save(entry);
+
+            // Copy over any existing employee deductions (from EmployeeDeduction template? No, only per-entry deductions exist.)
+            createdEntries.add(saved);
         }
 
         return createdEntries;
@@ -206,8 +448,14 @@ public class PayrollRunServiceImpl implements PayrollRunService {
             throw new BadRequestException("Entry does not belong to this payroll run");
         }
 
+        // Remove associated deductions first
+        List<EmployeeDeduction> deductions = employeeDeductionRepository.findByPayrollEntryId(entryId);
+        employeeDeductionRepository.deleteAll(deductions);
+
         payrollEntryRepository.delete(entry);
     }
+
+    // ====================== Entry Management ======================
 
     @Override
     @Transactional
@@ -290,10 +538,114 @@ public class PayrollRunServiceImpl implements PayrollRunService {
         }
     }
 
+    // ====================== Deduction Management ======================
+
+    @Override
+    @Transactional
+    public EmployeeDeduction addDeductionToEntry(UUID runId, UUID entryId, UUID deductionTypeId, BigDecimal amount) {
+        PayrollRun payrollRun = payrollRunRepository.findById(runId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayrollRun", runId));
+
+        if (payrollRun.getStatus() != PayrollRunStatus.DRAFT) {
+            throw new BusinessRuleException("Can only edit deductions in DRAFT payroll runs");
+        }
+
+        PayrollEntry entry = payrollEntryRepository.findById(entryId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayrollEntry", entryId));
+
+        if (!entry.getPayrollRun().getId().equals(runId)) {
+            throw new BadRequestException("Entry does not belong to this payroll run");
+        }
+
+        DeductionType deductionType = deductionTypeRepository.findById(deductionTypeId)
+                .orElseThrow(() -> new ResourceNotFoundException("DeductionType", deductionTypeId));
+
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("Deduction amount must be greater than zero");
+        }
+
+        EmployeeDeduction employeeDeduction = EmployeeDeduction.builder()
+                .payrollEntry(entry)
+                .deductionType(deductionType)
+                .amount(amount)
+                .build();
+
+        EmployeeDeduction saved = employeeDeductionRepository.save(employeeDeduction);
+
+        // Recalculate otherDeductions sum and net salary
+        recalculateOtherDeductions(entry);
+
+        return saved;
+    }
+
+    @Override
+    @Transactional
+    public void removeDeductionFromEntry(UUID runId, UUID entryId, UUID deductionId) {
+        PayrollRun payrollRun = payrollRunRepository.findById(runId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayrollRun", runId));
+
+        if (payrollRun.getStatus() != PayrollRunStatus.DRAFT) {
+            throw new BusinessRuleException("Can only edit deductions in DRAFT payroll runs");
+        }
+
+        PayrollEntry entry = payrollEntryRepository.findById(entryId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayrollEntry", entryId));
+
+        if (!entry.getPayrollRun().getId().equals(runId)) {
+            throw new BadRequestException("Entry does not belong to this payroll run");
+        }
+
+        EmployeeDeduction deduction = employeeDeductionRepository.findById(deductionId)
+                .orElseThrow(() -> new ResourceNotFoundException("EmployeeDeduction", deductionId));
+
+        if (!deduction.getPayrollEntry().getId().equals(entryId)) {
+            throw new BadRequestException("Deduction does not belong to this entry");
+        }
+
+        employeeDeductionRepository.delete(deduction);
+
+        // Recalculate otherDeductions sum
+        recalculateOtherDeductions(entry);
+    }
+
+    private void recalculateOtherDeductions(PayrollEntry entry) {
+        List<EmployeeDeduction> deductions = employeeDeductionRepository.findByPayrollEntryId(entry.getId());
+        BigDecimal totalOtherDeductions = BigDecimal.ZERO;
+        for (EmployeeDeduction ed : deductions) {
+            totalOtherDeductions = totalOtherDeductions.add(ed.getAmount());
+        }
+        entry.setOtherDeductions(totalOtherDeductions);
+
+        // Net salary already calculated, other deductions don't affect net pay
+        payrollEntryRepository.save(entry);
+    }
+
+    // ====================== Bulk Email ======================
+
+    @Override
+    @Transactional
+    public Map<String, Object> emailAllPayslips(UUID runId) {
+        PayrollRun payrollRun = payrollRunRepository.findById(runId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayrollRun", runId));
+
+        if (payrollRun.getStatus() != PayrollRunStatus.APPROVED) {
+            throw new BusinessRuleException("Payslips can only be emailed for APPROVED payroll runs");
+        }
+
+        return payslipService.emailAllPayslipsForRun(runId);
+    }
+
+    // ====================== Excel Export ======================
+
     @Override
     public byte[] exportPayrollRunToExcel(UUID runId) {
         PayrollRun payrollRun = payrollRunRepository.findById(runId)
                 .orElseThrow(() -> new ResourceNotFoundException("PayrollRun", runId));
+
+        // Export only available from SUBMITTED status onwards
+        if (payrollRun.getStatus() == PayrollRunStatus.DRAFT) {
+            throw new BusinessRuleException("Excel export is only available after submitting the payroll run.");
+        }
 
         List<PayrollEntry> entries = payrollEntryRepository.findByPayrollRunId(runId);
 
@@ -312,7 +664,6 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                 sheet = workbook.createSheet("PAYROLL");
             }
 
-            // Remove the default template sheets (keep only the first one if "Sheet0"/default exists)
             // Clear existing data rows (from row 4 onwards)
             for (int i = sheet.getLastRowNum(); i >= 3; i--) {
                 Row row = sheet.getRow(i);
@@ -601,5 +952,13 @@ public class PayrollRunServiceImpl implements PayrollRunService {
         font.setFontHeightInPoints((short) 14);
         style.setFont(font);
         return style;
+    }
+
+    private String getMonthName(int month) {
+        String[] monthNames = {
+            "January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"
+        };
+        return monthNames[month - 1];
     }
 }

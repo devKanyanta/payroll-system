@@ -30,7 +30,7 @@ public class EmployeeRequest {
     @NotNull(message = "Date hired is required")
     private LocalDate dateHired;
     @NotNull(message = "Basic salary is required")
-    private BigDecimal basicSalary;
+    private BigDecimal rate;
     private String status;
     private String site;
 }

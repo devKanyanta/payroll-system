@@ -1,6 +1,7 @@
 package com.payroll.controller;
 
 import com.payroll.dto.PagedResponse;
+import com.payroll.entity.EmployeeDeduction;
 import com.payroll.entity.PayrollEntry;
 import com.payroll.entity.PayrollRun;
 import com.payroll.entity.PayrollRunStatus;
@@ -53,6 +54,12 @@ public class PayrollRunController {
         return ResponseEntity.ok(payrollRunService.submitPayrollRun(id, userId));
     }
 
+    // New: Validate before submit
+    @PostMapping("/{id}/validate")
+    public ResponseEntity<List<Map<String, String>>> validatePayrollRun(@PathVariable UUID id) {
+        return ResponseEntity.ok(payrollRunService.validateBeforeSubmit(id));
+    }
+
     @PutMapping("/{id}/approve")
     public ResponseEntity<PayrollRun> approvePayrollRun(
             @PathVariable UUID id, @RequestAttribute("userId") UUID userId) {
@@ -103,10 +110,37 @@ public class PayrollRunController {
         return ResponseEntity.ok(payrollRunService.updatePayrollEntry(id, entryId, presentDays, overtimeHours, holidayHours));
     }
 
+    // New: Add deduction to an entry
+    @PostMapping("/{id}/entries/{entryId}/deductions")
+    public ResponseEntity<EmployeeDeduction> addDeductionToEntry(
+            @PathVariable UUID id,
+            @PathVariable UUID entryId,
+            @RequestBody Map<String, Object> request) {
+        UUID deductionTypeId = UUID.fromString((String) request.get("deductionTypeId"));
+        BigDecimal amount = BigDecimal.valueOf(((Number) request.get("amount")).doubleValue());
+        return ResponseEntity.ok(payrollRunService.addDeductionToEntry(id, entryId, deductionTypeId, amount));
+    }
+
+    // New: Remove deduction from entry
+    @DeleteMapping("/{id}/entries/{entryId}/deductions/{deductionId}")
+    public ResponseEntity<Void> removeDeductionFromEntry(
+            @PathVariable UUID id,
+            @PathVariable UUID entryId,
+            @PathVariable UUID deductionId) {
+        payrollRunService.removeDeductionFromEntry(id, entryId, deductionId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/{id}/recalculate-deductions")
     public ResponseEntity<Void> recalculateLoanDeductions(@PathVariable UUID id) {
         payrollRunService.recalculateLoanDeductions(id);
         return ResponseEntity.ok().build();
+    }
+
+    // New: Bulk email all payslips
+    @PostMapping("/{id}/email-payslips")
+    public ResponseEntity<Map<String, Object>> emailAllPayslips(@PathVariable UUID id) {
+        return ResponseEntity.ok(payrollRunService.emailAllPayslips(id));
     }
 
     @GetMapping("/{id}/export/excel")

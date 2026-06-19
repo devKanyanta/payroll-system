@@ -9,6 +9,7 @@ import com.payroll.entity.Payslip;
 import com.payroll.exception.ResourceNotFoundException;
 import com.payroll.repository.PayrollEntryRepository;
 import com.payroll.repository.PayslipRepository;
+import com.payroll.exception.BusinessRuleException;
 import com.payroll.service.EmailService;
 import com.payroll.service.FileStorageService;
 import com.payroll.service.PayslipService;
@@ -17,14 +18,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -331,6 +334,76 @@ public class PayslipServiceImpl implements PayslipService {
         return val.multiply(BigDecimal.valueOf(100))
                 .divide(total, 1, java.math.RoundingMode.HALF_UP)
                 .stripTrailingZeros().toPlainString() + "%";
+    }
+
+    @Override
+    public Map<String, Object> emailAllPayslipsForRun(UUID payrollRunId) {
+        List<Payslip> payslips = payslipRepository.findByPayrollRunId(payrollRunId);
+
+        if (payslips.isEmpty()) {
+            throw new BusinessRuleException("No payslips found for this payroll run. Generate payslips first.");
+        }
+
+        int total = payslips.size();
+        int succeeded = 0;
+        List<Map<String, String>> errors = new ArrayList<>();
+
+        for (Payslip payslip : payslips) {
+            try {
+                PayrollEntry entry = payslip.getPayrollEntry();
+                String employeeEmail = entry.getEmployee().getEmail();
+                String employeeName = entry.getEmployee().getFirstName() + " " + entry.getEmployee().getLastName();
+
+                if (employeeEmail == null || employeeEmail.isBlank()) {
+                    errors.add(Map.of(
+                            "employee", employeeName,
+                            "error", "No email address on file"
+                    ));
+                    continue;
+                }
+
+                byte[] pdf = downloadPayslip(payslip.getId());
+                String monthYear = MONTH_NAMES[entry.getPayrollRun().getMonth() - 1]
+                        + " " + entry.getPayrollRun().getYear();
+                String subject = "Payslip for " + monthYear;
+                String text = "Dear " + employeeName + ",\n\nPlease find your payslip for "
+                        + monthYear + " attached.\n\nRegards,\nPayroll Team";
+
+                emailService.sendPayslipEmail(employeeEmail, subject, text, pdf, "payslip.pdf");
+
+                payslip.setEmailedAt(LocalDateTime.now());
+                payslipRepository.save(payslip);
+                succeeded++;
+            } catch (Exception e) {
+                log.error("Failed to email payslip {}: {}", payslip.getId(), e.getMessage());
+                errors.add(Map.of(
+                        "payslipId", payslip.getId().toString(),
+                        "error", e.getMessage()
+                ));
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("total", total);
+        result.put("succeeded", succeeded);
+        result.put("failed", total - succeeded);
+        result.put("errors", errors);
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public void invalidatePayslipsForRun(UUID payrollRunId) {
+        List<Payslip> payslips = payslipRepository.findByPayrollRunId(payrollRunId);
+        for (Payslip payslip : payslips) {
+            // Mark as invalid by clearing the pdfPath and setting generatedAt to null
+            // New payslips will be generated on next approval
+            payslip.setPdfPath(null);
+            payslip.setGeneratedAt(null);
+            payslip.setEmailedAt(null);
+            payslipRepository.save(payslip);
+        }
+        log.info("Invalidated {} payslips for payroll run {}", payslips.size(), payrollRunId);
     }
 
     @Override

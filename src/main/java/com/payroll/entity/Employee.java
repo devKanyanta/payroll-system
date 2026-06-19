@@ -67,8 +67,8 @@ public class Employee {
     @Column(name = "date_hired", nullable = false)
     private LocalDate dateHired;
 
-    @Column(name = "basic_salary", nullable = false, precision = 12, scale = 2)
-    private BigDecimal basicSalary;
+    @Column(name = "rate", precision = 12, scale = 2)
+    private BigDecimal rate;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

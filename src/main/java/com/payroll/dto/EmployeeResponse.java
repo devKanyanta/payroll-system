@@ -31,7 +31,7 @@ public class EmployeeResponse {
     private String bankName;
     private String accountNumber;
     private LocalDate dateHired;
-    private BigDecimal basicSalary;
+    private BigDecimal rate;
     private String status;
     private LocalDateTime createdAt;
 }

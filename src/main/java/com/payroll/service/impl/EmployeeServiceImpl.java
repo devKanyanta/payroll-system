@@ -67,7 +67,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .bankName(request.getBankName())
                 .accountNumber(request.getAccountNumber())
                 .dateHired(request.getDateHired())
-                .basicSalary(request.getBasicSalary())
+                .rate(request.getRate())
                 .status(request.getStatus() != null ? EmployeeStatus.valueOf(request.getStatus()) : EmployeeStatus.ACTIVE)
                 .build();
 
@@ -111,7 +111,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         employee.setBankName(request.getBankName());
         employee.setAccountNumber(request.getAccountNumber());
         employee.setDateHired(request.getDateHired());
-        employee.setBasicSalary(request.getBasicSalary());
+        employee.setRate(request.getRate());
         employee.setStatus(request.getStatus() != null ? EmployeeStatus.valueOf(request.getStatus()) : employee.getStatus());
 
         return toResponse(employeeRepository.save(employee));
@@ -158,7 +158,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .bankName(employee.getBankName())
                 .accountNumber(employee.getAccountNumber())
                 .dateHired(employee.getDateHired())
-                .basicSalary(employee.getBasicSalary())
+                .rate(employee.getRate())
                 .status(employee.getStatus().name())
                 .createdAt(employee.getCreatedAt())
                 .build();

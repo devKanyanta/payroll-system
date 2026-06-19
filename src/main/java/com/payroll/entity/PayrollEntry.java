@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.UUID;
+import java.util.*;
 
 @Entity
 @Table(name = "payroll_entries")
@@ -93,6 +93,13 @@ public class PayrollEntry {
 
     @Column(name = "net_salary", nullable = false, precision = 12, scale = 2)
     private BigDecimal netSalary;
+
+    @OneToMany(mappedBy = "payrollEntry", fetch = FetchType.LAZY)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties("payrollEntry")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @Builder.Default
+    private List<EmployeeDeduction> employeeDeductions = new ArrayList<>();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

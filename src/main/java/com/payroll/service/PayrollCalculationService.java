@@ -12,7 +12,6 @@ public interface PayrollCalculationService {
                                        BigDecimal overtimeHours, BigDecimal holidayHours,
                                        List<Loan> activeLoans, BigDecimal otherDeductions,
                                        BigDecimal presentDays);
-    BigDecimal calculateHourlyRate(BigDecimal basicSalary, int workingDays, int hoursPerDay);
     BigDecimal calculateGrossSalary(BigDecimal regularAmount, BigDecimal overtimeAmount, BigDecimal holidayAmount);
     BigDecimal calculateRegularAmount(BigDecimal hourlyRate, BigDecimal hours);
     BigDecimal calculateOvertimeAmount(BigDecimal overtimeHours, BigDecimal overtimeRate);
