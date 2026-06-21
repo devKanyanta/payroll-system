@@ -1,0 +1,5 @@
+ALTER TABLE employees
+    ADD COLUMN IF NOT EXISTS rate DECIMAL(12, 2);
+
+ALTER TABLE employees
+    DROP COLUMN IF EXISTS basic_salary;

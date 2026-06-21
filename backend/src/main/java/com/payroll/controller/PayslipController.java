@@ -1,0 +1,51 @@
+package com.payroll.controller;
+
+import com.payroll.entity.Payslip;
+import com.payroll.service.PayslipService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/payslips")
+@RequiredArgsConstructor
+public class PayslipController {
+
+    private final PayslipService payslipService;
+
+    @GetMapping
+    public ResponseEntity<List<Payslip>> getPayslipsByEmployee(@RequestParam UUID employeeId) {
+        return ResponseEntity.ok(payslipService.getPayslipsByEmployee(employeeId));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Payslip> getPayslipById(@PathVariable UUID id) {
+        return ResponseEntity.ok(payslipService.getPayslipById(id));
+    }
+
+    @GetMapping("/{id}/download")
+    public ResponseEntity<byte[]> downloadPayslip(@PathVariable UUID id) {
+        byte[] pdf = payslipService.downloadPayslip(id);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=payslip-" + id + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @PostMapping("/generate/{payrollRunId}")
+    public ResponseEntity<Void> generatePayslips(@PathVariable UUID payrollRunId) {
+        payslipService.generatePayslips(payrollRunId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/{id}/email")
+    public ResponseEntity<Void> emailPayslip(@PathVariable UUID id) {
+        payslipService.emailPayslip(id);
+        return ResponseEntity.ok().build();
+    }
+}
