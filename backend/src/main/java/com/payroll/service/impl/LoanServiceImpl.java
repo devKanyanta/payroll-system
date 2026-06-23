@@ -25,6 +25,14 @@ public class LoanServiceImpl implements LoanService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<LoanResponse> getAllLoans() {
+        return loanRepository.findAll().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<LoanResponse> getLoansByEmployee(UUID employeeId) {
         return loanRepository.findByEmployeeId(employeeId).stream()
                 .map(this::toResponse)

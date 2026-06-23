@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 @Service
 @RequiredArgsConstructor
@@ -483,5 +485,52 @@ public class PayslipServiceImpl implements PayslipService {
 
         payslip.setEmailedAt(LocalDateTime.now());
         payslipRepository.save(payslip);
+    }
+
+    @Override
+    public byte[] downloadPayslipsZip(UUID payrollRunId) {
+        List<Payslip> payslips = payslipRepository.findByPayrollRunId(payrollRunId);
+
+        if (payslips.isEmpty()) {
+            throw new BusinessRuleException("No payslips found for this payroll run.");
+        }
+
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+                for (Payslip payslip : payslips) {
+                    String pdfPath = payslip.getPdfPath();
+                    if (pdfPath == null) {
+                        log.warn("Payslip {} has no PDF file — skipping", payslip.getId());
+                        continue;
+                    }
+
+                    try {
+                        var resource = fileStorageService.loadFile(pdfPath);
+                        byte[] pdfBytes;
+                        try (var is = resource.getInputStream()) {
+                            pdfBytes = is.readAllBytes();
+                        }
+
+                        String employeeName = payslip.getPayrollEntry().getEmployee().getFirstName()
+                                + "_" + payslip.getPayrollEntry().getEmployee().getLastName();
+                        String monthYear = MONTH_NAMES[payslip.getPayrollEntry().getPayrollRun().getMonth() - 1]
+                                + "_" + payslip.getPayrollEntry().getPayrollRun().getYear();
+                        String entryName = employeeName + "_" + monthYear + ".pdf";
+
+                        ZipEntry zipEntry = new ZipEntry(entryName);
+                        zipEntry.setSize(pdfBytes.length);
+                        zos.putNextEntry(zipEntry);
+                        zos.write(pdfBytes);
+                        zos.closeEntry();
+                    } catch (IOException e) {
+                        log.error("Failed to read payslip {}: {}", payslip.getId(), e.getMessage());
+                    }
+                }
+            }
+            return baos.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to create ZIP file", e);
+        }
     }
 }

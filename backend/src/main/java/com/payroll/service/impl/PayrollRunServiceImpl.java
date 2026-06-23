@@ -644,6 +644,122 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                     .orElse(null);
 
             // ============================================================
+            // SHARED STYLES
+            // ============================================================
+
+            CellStyle navyHeaderStyle = workbook.createCellStyle();
+            Font navyFont = workbook.createFont();
+            navyFont.setBold(true);
+            navyFont.setColor(IndexedColors.WHITE.getIndex());
+            navyFont.setFontHeightInPoints((short) 10);
+            navyHeaderStyle.setFont(navyFont);
+            navyHeaderStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+            navyHeaderStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            navyHeaderStyle.setBorderBottom(BorderStyle.THIN);
+            navyHeaderStyle.setBorderTop(BorderStyle.THIN);
+            navyHeaderStyle.setBorderLeft(BorderStyle.THIN);
+            navyHeaderStyle.setBorderRight(BorderStyle.THIN);
+            navyHeaderStyle.setAlignment(HorizontalAlignment.CENTER);
+            navyHeaderStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle currencyStyle = workbook.createCellStyle();
+            currencyStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
+            currencyStyle.setBorderBottom(BorderStyle.THIN);
+            currencyStyle.setBorderTop(BorderStyle.THIN);
+            currencyStyle.setBorderLeft(BorderStyle.THIN);
+            currencyStyle.setBorderRight(BorderStyle.THIN);
+            currencyStyle.setAlignment(HorizontalAlignment.RIGHT);
+            currencyStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle intStyle = workbook.createCellStyle();
+            intStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0"));
+            intStyle.setBorderBottom(BorderStyle.THIN);
+            intStyle.setBorderTop(BorderStyle.THIN);
+            intStyle.setBorderLeft(BorderStyle.THIN);
+            intStyle.setBorderRight(BorderStyle.THIN);
+            intStyle.setAlignment(HorizontalAlignment.RIGHT);
+            intStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle textStyle = workbook.createCellStyle();
+            textStyle.setBorderBottom(BorderStyle.THIN);
+            textStyle.setBorderTop(BorderStyle.THIN);
+            textStyle.setBorderLeft(BorderStyle.THIN);
+            textStyle.setBorderRight(BorderStyle.THIN);
+            textStyle.setAlignment(HorizontalAlignment.LEFT);
+            textStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle totalLabelStyle = workbook.createCellStyle();
+            Font boldFont = workbook.createFont();
+            boldFont.setBold(true);
+            boldFont.setFontHeightInPoints((short) 10);
+            totalLabelStyle.setFont(boldFont);
+            totalLabelStyle.setBorderTop(BorderStyle.DOUBLE);
+            totalLabelStyle.setAlignment(HorizontalAlignment.RIGHT);
+            totalLabelStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle totalValueStyle = workbook.createCellStyle();
+            Font boldCurrencyFont = workbook.createFont();
+            boldCurrencyFont.setBold(true);
+            boldCurrencyFont.setFontHeightInPoints((short) 11);
+            totalValueStyle.setFont(boldCurrencyFont);
+            totalValueStyle.setBorderTop(BorderStyle.DOUBLE);
+            totalValueStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
+            totalValueStyle.setAlignment(HorizontalAlignment.RIGHT);
+            totalValueStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle titleStyle = workbook.createCellStyle();
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 14);
+            titleFont.setColor(IndexedColors.WHITE.getIndex());
+            titleStyle.setFont(titleFont);
+            titleStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+            titleStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            titleStyle.setAlignment(HorizontalAlignment.CENTER);
+            titleStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle subtitleStyle = workbook.createCellStyle();
+            Font subtitleFont = workbook.createFont();
+            subtitleFont.setFontHeightInPoints((short) 10);
+            subtitleFont.setColor(IndexedColors.GREY_80_PERCENT.getIndex());
+            subtitleStyle.setFont(subtitleFont);
+            subtitleStyle.setAlignment(HorizontalAlignment.CENTER);
+
+            CellStyle totalRowLabelStyle = workbook.createCellStyle();
+            totalRowLabelStyle.setFont(boldFont);
+            totalRowLabelStyle.setBorderBottom(BorderStyle.THIN);
+            totalRowLabelStyle.setBorderTop(BorderStyle.DOUBLE);
+            totalRowLabelStyle.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+            totalRowLabelStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            totalRowLabelStyle.setAlignment(HorizontalAlignment.RIGHT);
+            totalRowLabelStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle totalRowValueStyle = workbook.createCellStyle();
+            totalRowValueStyle.setFont(boldCurrencyFont);
+            totalRowValueStyle.setBorderBottom(BorderStyle.THIN);
+            totalRowValueStyle.setBorderTop(BorderStyle.DOUBLE);
+            totalRowValueStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
+            totalRowValueStyle.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+            totalRowValueStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            totalRowValueStyle.setAlignment(HorizontalAlignment.RIGHT);
+            totalRowValueStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle altRowStyle = workbook.createCellStyle();
+            altRowStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
+            altRowStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            altRowStyle.setBorderBottom(BorderStyle.THIN);
+            altRowStyle.setBorderLeft(BorderStyle.THIN);
+            altRowStyle.setBorderRight(BorderStyle.THIN);
+            altRowStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            String[] monthNames = {
+                "January", "February", "March", "April", "May", "June",
+                "July", "August", "September", "October", "November", "December"
+            };
+            String periodStr = monthNames[payrollRun.getMonth() - 1] + " " + payrollRun.getYear();
+            int normalWorkingHrs = settings != null ? settings.getHoursPerDay() : 8;
+
+            // ============================================================
             // SHEET 1: PAYROLL SUMMARY
             // ============================================================
             Sheet sheet = workbook.getSheet("PAYROLL");
@@ -651,176 +767,209 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                 sheet = workbook.createSheet("PAYROLL");
             }
 
-            // Clear existing data rows (from row 4 onwards)
-            for (int i = sheet.getLastRowNum(); i >= 3; i--) {
+            // Clear all existing rows
+            for (int i = sheet.getLastRowNum(); i >= 0; i--) {
                 Row row = sheet.getRow(i);
                 if (row != null) {
                     sheet.removeRow(row);
                 }
             }
 
-            // Create header row (row 3, 0-indexed)
-            Row headerRow = sheet.getRow(3);
-            if (headerRow == null) {
-                headerRow = sheet.createRow(3);
-            }
-            String[] headers = {"S/N", "NAMES", "NRC", "JOB TITTLE", "SITE", "RATE/HRS",
-                    "NORMAL WORKING HRS", "OVER TIME RATE", "HOLIDAY OVERTIME RATE",
-                    "PRESENT DAYS", "PRESENT AMOUNT", "OVERT TIME", "OVER TIME AMOUNT",
-                    "HOLIDAY OVER TIME", "HOLIDAY OVER TIME AMOUNT", "GROSS SALARY",
-                    "NHIMA", "NAPSA", "SOFT LOAN", "SOFT LOAN DEDUCTION",
-                    "OTHER DEDUCTION", "NET PAY"};
+            // --- Title row ---
+            Row titleRow = sheet.createRow(0);
+            titleRow.setHeightInPoints(24);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("Musunga Engineering Services Ltd — PAYROLL SUMMARY " + periodStr);
+            titleCell.setCellStyle(titleStyle);
+            // Merge title across all columns
+            sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(0, 0, 0, 21));
+
+            // --- Subtitle row ---
+            Row subtitleRow = sheet.createRow(1);
+            subtitleRow.setHeightInPoints(18);
+            Cell subtitleCell = subtitleRow.createCell(0);
+            subtitleCell.setCellValue("Payroll Department  |  " + periodStr);
+            subtitleCell.setCellStyle(subtitleStyle);
+            sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(1, 1, 0, 21));
+
+            // --- Header row (row 3, 0-indexed = 2 after title rows) ---
+            Row headerRow = sheet.createRow(3);
+            headerRow.setHeightInPoints(22);
+            String[] headers = {"S/N", "NAMES", "NRC", "JOB TITLE", "SITE", "RATE/HRS",
+                    "NORMAL HRS", "OT RATE", "HOL RATE",
+                    "PRESENT DAYS", "PRESENT AMT", "OT HRS", "OT AMT",
+                    "HOL HRS", "HOL AMT", "GROSS",
+                    "NHIMA", "NAPSA", "LOAN BAL", "LOAN DED",
+                    "OTHER DED", "NET PAY"};
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers[i]);
-                cell.setCellStyle(getHeaderCellStyle(workbook));
+                cell.setCellStyle(navyHeaderStyle);
             }
 
-            int normalWorkingHrs = settings != null ? settings.getHoursPerDay() : 8;
-
-            // Data rows starting from row 4
+            // --- Data rows starting from row 4 ---
             int rowNum = 4;
-            CellStyle currencyStyle = getCurrencyCellStyle(workbook);
-            CellStyle intStyle = getIntegerCellStyle(workbook);
             for (int i = 0; i < entries.size(); i++) {
                 PayrollEntry entry = entries.get(i);
                 Row row = sheet.createRow(rowNum++);
+                row.setHeightInPoints(18);
 
-                row.createCell(0).setCellValue(i + 1); // S/N
-                row.createCell(1).setCellValue(entry.getEmployee().getFirstName() + " " + entry.getEmployee().getLastName()); // NAMES
-                row.createCell(2).setCellValue(entry.getEmployee().getNrc()); // NRC
-                row.createCell(3).setCellValue(entry.getEmployee().getPosition() != null ? entry.getEmployee().getPosition() : ""); // JOB TITTLE
-                row.createCell(4).setCellValue(entry.getSite() != null ? entry.getSite() : ""); // SITE
-                row.createCell(5).setCellValue(entry.getHourlyRate() != null ? entry.getHourlyRate().doubleValue() : 0); // RATE/HRS
-                row.createCell(6).setCellValue(normalWorkingHrs); // NORMAL WORKING HRS
+                Cell snCell = row.createCell(0);
+                snCell.setCellValue(i + 1);
+                snCell.setCellStyle(i % 2 == 0 ? textStyle : altRowStyle);
 
-                // OVER TIME RATE = hourlyRate * overtimeRate
+                Cell nameCell = row.createCell(1);
+                nameCell.setCellValue(entry.getEmployee().getFirstName() + " " + entry.getEmployee().getLastName());
+                nameCell.setCellStyle(i % 2 == 0 ? textStyle : altRowStyle);
+
+                Cell nrcCell = row.createCell(2);
+                nrcCell.setCellValue(entry.getEmployee().getNrc());
+                nrcCell.setCellStyle(i % 2 == 0 ? textStyle : altRowStyle);
+
+                Cell posCell = row.createCell(3);
+                posCell.setCellValue(entry.getEmployee().getPosition() != null ? entry.getEmployee().getPosition() : "");
+                posCell.setCellStyle(i % 2 == 0 ? textStyle : altRowStyle);
+
+                Cell siteCell = row.createCell(4);
+                siteCell.setCellValue(entry.getSite() != null ? entry.getSite() : "");
+                siteCell.setCellStyle(i % 2 == 0 ? textStyle : altRowStyle);
+
+                Cell rateCell = row.createCell(5);
+                rateCell.setCellValue(entry.getHourlyRate() != null ? entry.getHourlyRate().doubleValue() : 0);
+                rateCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
+
+                Cell hrsCell = row.createCell(6);
+                hrsCell.setCellValue(normalWorkingHrs);
+                hrsCell.setCellStyle(i % 2 == 0 ? intStyle : cloneStyle(workbook, altRowStyle));
+
+                // Overtime rate
                 BigDecimal overtimeRateSetting = settings != null ? settings.getOvertimeRate() : new BigDecimal("1.5");
-                BigDecimal overTimeRateHrly = entry.getHourlyRate() != null
+                BigDecimal otRateVal = entry.getHourlyRate() != null
                         ? entry.getHourlyRate().multiply(overtimeRateSetting)
                         : BigDecimal.ZERO;
-                row.createCell(7).setCellValue(overTimeRateHrly.doubleValue());
+                Cell otRateCell = row.createCell(7);
+                otRateCell.setCellValue(otRateVal.doubleValue());
+                otRateCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
 
-                // HOLIDAY OVERTIME RATE = hourlyRate * holidayRate
+                // Holiday rate
                 BigDecimal holidayRateSetting = settings != null ? settings.getHolidayRate() : new BigDecimal("2.0");
-                BigDecimal holidayRateHrly = entry.getHourlyRate() != null
+                BigDecimal holRateVal = entry.getHourlyRate() != null
                         ? entry.getHourlyRate().multiply(holidayRateSetting)
                         : BigDecimal.ZERO;
-                row.createCell(8).setCellValue(holidayRateHrly.doubleValue());
+                Cell holRateCell = row.createCell(8);
+                holRateCell.setCellValue(holRateVal.doubleValue());
+                holRateCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
 
-                setCellValue(row.createCell(9), entry.getPresentDays(), intStyle); // PRESENT DAYS
-                setCellValue(row.createCell(10), entry.getRegularAmount(), currencyStyle); // PRESENT AMOUNT
-                setCellValue(row.createCell(11), entry.getOvertimeHours(), intStyle); // OVERT TIME
-                setCellValue(row.createCell(12), entry.getOvertimeAmount(), currencyStyle); // OVER TIME AMOUNT
-                setCellValue(row.createCell(13), entry.getHolidayHours(), intStyle); // HOLIDAY OVER TIME
-                setCellValue(row.createCell(14), entry.getHolidayAmount(), currencyStyle); // HOLIDAY OVER TIME AMOUNT
-                setCellValue(row.createCell(15), entry.getGrossSalary(), currencyStyle); // GROSS SALARY
-                setCellValue(row.createCell(16), entry.getNhima(), currencyStyle); // NHIMA
-                setCellValue(row.createCell(17), entry.getNapsa(), currencyStyle); // NAPSA
-                setCellValue(row.createCell(18), entry.getLoanBalance(), currencyStyle); // SOFT LOAN
-                setCellValue(row.createCell(19), entry.getLoanDeduction(), currencyStyle); // SOFT LOAN DEDUCTION
-                setCellValue(row.createCell(20), entry.getOtherDeductions(), currencyStyle); // OTHER DEDUCTION
-                setCellValue(row.createCell(21), entry.getNetSalary(), currencyStyle); // NET PAY
+                // Present days
+                Cell presentDaysCell = row.createCell(9);
+                presentDaysCell.setCellValue(entry.getPresentDays() != null ? entry.getPresentDays().doubleValue() : 0);
+                presentDaysCell.setCellStyle(i % 2 == 0 ? intStyle : cloneStyle(workbook, altRowStyle));
+
+                // Present amount
+                Cell presentAmtCell = row.createCell(10);
+                presentAmtCell.setCellValue(entry.getRegularAmount() != null ? entry.getRegularAmount().doubleValue() : 0);
+                presentAmtCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
+
+                // OT hours
+                Cell otHrsCell = row.createCell(11);
+                otHrsCell.setCellValue(entry.getOvertimeHours() != null ? entry.getOvertimeHours().doubleValue() : 0);
+                otHrsCell.setCellStyle(i % 2 == 0 ? intStyle : cloneStyle(workbook, altRowStyle));
+
+                // OT amount
+                Cell otAmtCell = row.createCell(12);
+                otAmtCell.setCellValue(entry.getOvertimeAmount() != null ? entry.getOvertimeAmount().doubleValue() : 0);
+                otAmtCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
+
+                // Holiday hours
+                Cell holHrsCell = row.createCell(13);
+                holHrsCell.setCellValue(entry.getHolidayHours() != null ? entry.getHolidayHours().doubleValue() : 0);
+                holHrsCell.setCellStyle(i % 2 == 0 ? intStyle : cloneStyle(workbook, altRowStyle));
+
+                // Holiday amount
+                Cell holAmtCell = row.createCell(14);
+                holAmtCell.setCellValue(entry.getHolidayAmount() != null ? entry.getHolidayAmount().doubleValue() : 0);
+                holAmtCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
+
+                // Gross salary
+                Cell grossCell = row.createCell(15);
+                grossCell.setCellValue(entry.getGrossSalary() != null ? entry.getGrossSalary().doubleValue() : 0);
+                grossCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
+
+                // NHIMA
+                Cell nhimaCell = row.createCell(16);
+                nhimaCell.setCellValue(entry.getNhima() != null ? entry.getNhima().doubleValue() : 0);
+                nhimaCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
+
+                // NAPSA
+                Cell napsaCell = row.createCell(17);
+                napsaCell.setCellValue(entry.getNapsa() != null ? entry.getNapsa().doubleValue() : 0);
+                napsaCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
+
+                // Loan balance
+                Cell loanBalCell = row.createCell(18);
+                loanBalCell.setCellValue(entry.getLoanBalance() != null ? entry.getLoanBalance().doubleValue() : 0);
+                loanBalCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
+
+                // Loan deduction
+                Cell loanDedCell = row.createCell(19);
+                loanDedCell.setCellValue(entry.getLoanDeduction() != null ? entry.getLoanDeduction().doubleValue() : 0);
+                loanDedCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
+
+                // Other deductions
+                Cell otherDedCell = row.createCell(20);
+                otherDedCell.setCellValue(entry.getOtherDeductions() != null ? entry.getOtherDeductions().doubleValue() : 0);
+                otherDedCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
+
+                // Net pay
+                Cell netCell = row.createCell(21);
+                netCell.setCellValue(entry.getNetSalary() != null ? entry.getNetSalary().doubleValue() : 0);
+                netCell.setCellStyle(i % 2 == 0 ? currencyStyle : cloneStyle(workbook, altRowStyle));
             }
 
-            // Summary row
+            // --- Totals row ---
             if (!entries.isEmpty()) {
-                Row summaryRow = sheet.createRow(rowNum + 1);
-                summaryRow.createCell(0).setCellValue("TOTALS");
+                Row summaryRow = sheet.createRow(rowNum);
+                summaryRow.setHeightInPoints(20);
+
+                Cell totalLabel = summaryRow.createCell(0);
+                totalLabel.setCellValue("TOTALS");
+                totalLabel.setCellStyle(totalRowLabelStyle);
+
+                // Merge "TOTALS" across first few columns
+                for (int i = 1; i <= 8; i++) {
+                    Cell emptyCell = summaryRow.createCell(i);
+                    emptyCell.setCellStyle(totalRowLabelStyle);
+                }
+
+                // Sum numeric columns
+                int[] sumCols = {9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21};
+                for (int col : sumCols) {
+                    double sum = 0;
+                    for (int r = 4; r < rowNum; r++) {
+                        Row dataRow = sheet.getRow(r);
+                        if (dataRow != null) {
+                            Cell cell = dataRow.getCell(col);
+                            if (cell != null) {
+                                sum += cell.getNumericCellValue();
+                            }
+                        }
+                    }
+                    Cell sumCell = summaryRow.createCell(col);
+                    sumCell.setCellValue(sum);
+                    sumCell.setCellStyle(totalRowValueStyle);
+                }
             }
 
-            // ============================================================
-            // SHEETS 2+: Individual PAYSLIP for each employee
-            // Clone the formatted PAYSLIP template sheet for each employee
-            // ============================================================
-            String[] monthNames = {
-                "January", "February", "March", "April", "May", "June",
-                "July", "August", "September", "October", "November", "December"
-            };
-            String periodStr = monthNames[payrollRun.getMonth() - 1] + " " + payrollRun.getYear();
+            // Auto-size columns for better readability
+            for (int i = 0; i < 22; i++) {
+                sheet.autoSizeColumn(i);
+            }
+            // Set minimum column widths
+            sheet.setColumnWidth(0, Math.max(sheet.getColumnWidth(0), 1200));
+            sheet.setColumnWidth(1, Math.max(sheet.getColumnWidth(1), 7000));
 
+            // Remove the original PAYSLIP template sheet — we won't clone it since we have individual PDF payslips instead
             int payslipTemplateIdx = workbook.getSheetIndex("PAYSLIP");
-
-            for (int i = 0; i < entries.size(); i++) {
-                PayrollEntry entry = entries.get(i);
-                var employee = entry.getEmployee();
-
-                // Clone the formatted PAYSLIP template sheet
-                Sheet payslipSheet = workbook.cloneSheet(payslipTemplateIdx);
-                int newIdx = workbook.getSheetIndex(payslipSheet);
-                workbook.setSheetName(newIdx, "PAYSLIP " + (i + 1));
-
-                // Helper to get or create a cell
-                java.util.function.BiFunction<Integer, Integer, Cell> getCell = (rowIdx, colIdx) -> {
-                    Row row = payslipSheet.getRow(rowIdx);
-                    if (row == null) row = payslipSheet.createRow(rowIdx);
-                    Cell cell = row.getCell(colIdx);
-                    if (cell == null) cell = row.createCell(colIdx);
-                    return cell;
-                };
-
-                // Row 1 (0-indexed): Period & Page
-                getCell.apply(1, 3).setCellValue("PAY STATEMENT FOR: " + periodStr);
-                getCell.apply(1, 7).setCellValue("Page                      " + (i + 1));
-
-                // Row 3: Employee header line — update EMP NO cell
-                getCell.apply(3, 0).setCellValue("EMP NO   " + employee.getEmployeeNumber());
-                // GRADE value
-                getCell.apply(3, 4).setCellValue(employee.getPosition() != null ? employee.getPosition() : "");
-                // MINE SITE value
-                getCell.apply(3, 5).setCellValue(employee.getSite() != null ? employee.getSite() : "");
-                // NORMAL WORKING HRS value
-                getCell.apply(3, 7).setCellValue(normalWorkingHrs);
-
-                // Row 4: NAME
-                getCell.apply(4, 0).setCellValue("NAME:      " + employee.getFirstName() + " " + employee.getLastName());
-
-                // Row 5: NRC
-                getCell.apply(5, 0).setCellValue("N.R.C:        " + employee.getNrc());
-
-                // Row 6: Date Engaged
-                String dateHiredStr = employee.getDateHired() != null
-                        ? java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy").format(employee.getDateHired())
-                        : "-";
-                getCell.apply(6, 0).setCellValue("DATE Engaged: " + dateHiredStr);
-
-                // Row 10: BASIC PAY
-                getCell.apply(10, 2).setCellValue(entry.getPresentDays() != null ? entry.getPresentDays().doubleValue() : 0);
-                getCell.apply(10, 3).setCellValue(entry.getRegularAmount() != null ? entry.getRegularAmount().doubleValue() : 0);
-                getCell.apply(10, 7).setCellValue(entry.getNapsa() != null ? entry.getNapsa().doubleValue() : 0);
-
-                BigDecimal loanDed = entry.getLoanDeduction() != null ? entry.getLoanDeduction() : BigDecimal.ZERO;
-
-                // Row 11: OVERTIME
-                getCell.apply(11, 2).setCellValue(entry.getOvertimeHours() != null ? entry.getOvertimeHours().doubleValue() : 0);
-                getCell.apply(11, 3).setCellValue(entry.getOvertimeAmount() != null ? entry.getOvertimeAmount().doubleValue() : 0);
-                getCell.apply(11, 7).setCellValue(loanDed.doubleValue());
-
-                // Row 12: SHIFT DIFFERENTIAL / NHIMA
-                getCell.apply(12, 2).setCellValue(0);
-                getCell.apply(12, 3).setCellValue(0);
-                getCell.apply(12, 7).setCellValue(entry.getNhima() != null ? entry.getNhima().doubleValue() : 0);
-
-                // Row 13: SUNDAY/HOLIDAY OT / OTHER
-                getCell.apply(13, 2).setCellValue(entry.getHolidayHours() != null ? entry.getHolidayHours().doubleValue() : 0);
-                getCell.apply(13, 3).setCellValue(entry.getHolidayAmount() != null ? entry.getHolidayAmount().doubleValue() : 0);
-                BigDecimal otherDed = entry.getOtherDeductions() != null ? entry.getOtherDeductions() : BigDecimal.ZERO;
-                getCell.apply(13, 7).setCellValue(otherDed.doubleValue());
-
-                // Row 15: Total Earnings & Total Deductions
-                getCell.apply(15, 3).setCellValue(entry.getGrossSalary() != null ? entry.getGrossSalary().doubleValue() : 0);
-                BigDecimal totalDeductions = entry.getNapsa()
-                        .add(entry.getNhima())
-                        .add(loanDed)
-                        .add(otherDed);
-                getCell.apply(15, 7).setCellValue(totalDeductions.doubleValue());
-
-                // Row 16: Net Pay
-                getCell.apply(16, 3).setCellValue(entry.getGrossSalary() != null ? entry.getGrossSalary().doubleValue() : 0);
-                getCell.apply(16, 7).setCellValue(entry.getNetSalary() != null ? entry.getNetSalary().doubleValue() : 0);
-            }
-
-            // Remove the original PAYSLIP template sheet (after all cloning is done)
             if (payslipTemplateIdx >= 0 && payslipTemplateIdx < workbook.getNumberOfSheets()) {
                 workbook.removeSheetAt(payslipTemplateIdx);
             }
@@ -832,6 +981,12 @@ public class PayrollRunServiceImpl implements PayrollRunService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to export payroll run to Excel", e);
         }
+    }
+
+    private CellStyle cloneStyle(Workbook workbook, CellStyle base) {
+        CellStyle cloned = workbook.createCellStyle();
+        cloned.cloneStyleFrom(base);
+        return cloned;
     }
 
     private void setCellValue(Cell cell, BigDecimal value, CellStyle style) {

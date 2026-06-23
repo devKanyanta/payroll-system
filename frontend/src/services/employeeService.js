@@ -7,5 +7,5 @@ export const employeeService = {
   update: (id, data) => api.put(`/employees/${id}`, data),
   delete: (id) => api.delete(`/employees/${id}`),
   getNextNumber: () => api.get('/employees/next-number'),
-  getAvailableForRun: (payrollRunId) => api.get(`/employees/available-for-run/${payrollRunId}`),
+  getAvailableForRun: (payrollRunId, departmentId) => api.get(`/employees/available-for-run/${payrollRunId}`, { params: { departmentId } }),
 };

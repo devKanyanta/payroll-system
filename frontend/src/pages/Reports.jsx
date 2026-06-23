@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Box, Typography, Button, Card, CardContent, Grid, TextField,
-  Select, MenuItem, FormControl, InputLabel, Table, TableBody,
-  TableCell, TableContainer, TableHead, TableRow, Divider, Alert,
+  Select, MenuItem, FormControl, InputLabel, Stack, alpha,
 } from '@mui/material';
-import { Download, PictureAsPdf, TableChart } from '@mui/icons-material';
+import {
+  Download, PictureAsPdf, People, Receipt, AccountBalance,
+  TrendingDown, MoneyOff, Description,
+} from '@mui/icons-material';
 import { reportService } from '../services/reportService';
 import { departmentService } from '../services/departmentService';
 import LoadingScreen from '../components/LoadingScreen';
@@ -18,6 +20,39 @@ const months = [
   { value: 9, label: 'September' }, { value: 10, label: 'October' },
   { value: 11, label: 'November' }, { value: 12, label: 'December' },
 ];
+
+function StatCard({ label, value, icon, color }) {
+  return (
+    <Grid item xs={12} sm={6} md={3}>
+      <Card sx={{
+        bgcolor: color ? alpha(color, 0.08) : 'background.paper',
+        border: color ? `1px solid ${alpha(color, 0.2)}` : undefined,
+      }}>
+        <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            {icon && (
+              <Box sx={{
+                width: 40, height: 40, borderRadius: 1.5,
+                bgcolor: color ? alpha(color, 0.12) : alpha('#6b7280', 0.08),
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                {icon}
+              </Box>
+            )}
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="caption" color="text.secondary" fontWeight={500} sx={{ display: 'block', whiteSpace: 'nowrap' }}>
+                {label}
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2, fontSize: '1rem', fontVariantNumeric: 'tabular-nums' }}>
+                {value}
+              </Typography>
+            </Box>
+          </Stack>
+        </CardContent>
+      </Card>
+    </Grid>
+  );
+}
 
 export default function Reports() {
   const [tab, setTab] = useState('payroll');
@@ -51,29 +86,37 @@ export default function Reports() {
   });
 
   const handleExportExcel = async () => {
-    try {
-      await reportService.exportExcel(month, year);
-    } catch (err) {
-      console.error('Excel export failed:', err);
-    }
+    try { await reportService.exportExcel(month, year); }
+    catch (err) { console.error('Excel export failed:', err); }
   };
 
   const handleExportPdf = async () => {
-    try {
-      await reportService.exportPdf(month, year);
-    } catch (err) {
-      console.error('PDF export failed:', err);
-    }
+    try { await reportService.exportPdf(month, year); }
+    catch (err) { console.error('PDF export failed:', err); }
+  };
+
+  const formatCurrency = (value) => {
+    if (value == null) return 'ZMW 0';
+    return `ZMW ${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 3 }}>Reports</Typography>
+      {/* ── Header ── */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, flexWrap: 'wrap', gap: 1 }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 800 }}>Reports</Typography>
+          <Typography variant="body2" color="text.secondary">
+            View and export payroll summaries and expense reports
+          </Typography>
+        </Box>
+      </Box>
 
+      {/* ── Filters ── */}
       <Card sx={{ mb: 3 }}>
-        <CardContent sx={{ pb: 1 }}>
+        <CardContent sx={{ pb: '12px !important' }}>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={6} sm={3}>
+            <Grid item xs={6} sm={3} md={2}>
               <FormControl fullWidth size="small">
                 <InputLabel>Month</InputLabel>
                 <Select value={month} label="Month" onChange={(e) => setMonth(e.target.value)}>
@@ -81,11 +124,11 @@ export default function Reports() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid item xs={6} sm={3} md={2}>
               <TextField fullWidth label="Year" type="number" size="small" value={year}
-                onChange={(e) => setYear(parseInt(e.target.value))} />
+                onChange={(e) => setYear(parseInt(e.target.value) || new Date().getFullYear())} />
             </Grid>
-            <Grid item xs={12} sm={3}>
+            <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth size="small">
                 <InputLabel>Department</InputLabel>
                 <Select value={deptId} label="Department" onChange={(e) => setDeptId(e.target.value)}>
@@ -94,77 +137,144 @@ export default function Reports() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={6} sm={3}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
+            <Grid item xs={12} sm={12} md={5}>
+              <Stack direction="row" spacing={1} justifyContent={{ xs: 'flex-start', md: 'flex-end' }}>
                 <Button size="small" variant="outlined" startIcon={<Download />} onClick={handleExportExcel}>
                   Excel
                 </Button>
                 <Button size="small" variant="outlined" startIcon={<PictureAsPdf />} onClick={handleExportPdf}>
                   PDF
                 </Button>
-              </Box>
+              </Stack>
             </Grid>
           </Grid>
         </CardContent>
       </Card>
 
+      {/* ── Tab Content ── */}
       <Card>
         <CardContent>
-          <Box sx={{ display: 'flex', gap: 2, mb: 3, borderBottom: 1, borderColor: 'divider', pb: 1 }}>
-            <Button variant={tab === 'payroll' ? 'contained' : 'text'}
-              onClick={() => setTab('payroll')}>Payroll Summary</Button>
-            <Button variant={tab === 'expenses' ? 'contained' : 'text'}
-              onClick={() => setTab('expenses')}>Expense Report</Button>
+          {/* Tabs */}
+          <Box sx={{ display: 'flex', gap: 0, mb: 3, borderBottom: 1, borderColor: 'divider' }}>
+            <Box
+              onClick={() => setTab('payroll')}
+              sx={{
+                px: 3, py: 1.5, cursor: 'pointer', userSelect: 'none', fontWeight: 600, fontSize: '0.875rem',
+                color: tab === 'payroll' ? '#2563eb' : 'text.secondary',
+                borderBottom: tab === 'payroll' ? '2px solid #2563eb' : '2px solid transparent',
+                mb: '-1px',
+                transition: 'all 0.15s',
+                '&:hover': { color: tab === 'payroll' ? '#2563eb' : 'text.primary' },
+              }}
+            >
+              Payroll Summary
+            </Box>
+            <Box
+              onClick={() => setTab('expenses')}
+              sx={{
+                px: 3, py: 1.5, cursor: 'pointer', userSelect: 'none', fontWeight: 600, fontSize: '0.875rem',
+                color: tab === 'expenses' ? '#2563eb' : 'text.secondary',
+                borderBottom: tab === 'expenses' ? '2px solid #2563eb' : '2px solid transparent',
+                mb: '-1px',
+                transition: 'all 0.15s',
+                '&:hover': { color: tab === 'expenses' ? '#2563eb' : 'text.primary' },
+              }}
+            >
+              Expense Report
+            </Box>
           </Box>
 
+          {/* Payroll Summary */}
           {tab === 'payroll' && (
             summaryLoading ? <LoadingScreen /> : !payrollSummary ? (
-              <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>No data</Typography>
+              <Box sx={{ textAlign: 'center', py: 6 }}>
+                <Receipt sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No Payroll Data
+                </Typography>
+                <Typography variant="body2" color="text.disabled">
+                  Select a different month/year or run a payroll for this period
+                </Typography>
+              </Box>
             ) : (
-              <Grid container spacing={3}>
-                <SummaryCard label="Total Employees" value={payrollSummary.totalEmployees} />
-                <SummaryCard label="Total Gross Salary" value={`ZMW ${(payrollSummary.totalGrossSalary || 0).toLocaleString()}`} />
-                <SummaryCard label="Total NHIMA" value={`ZMW ${(payrollSummary.totalNhima || 0).toLocaleString()}`} />
-                <SummaryCard label="Total NAPSA" value={`ZMW ${(payrollSummary.totalNapsa || 0).toLocaleString()}`} />
-                <SummaryCard label="Total Loan Deductions" value={`ZMW ${(payrollSummary.totalLoanDeductions || 0).toLocaleString()}`} />
-                <SummaryCard label="Total Other Deductions" value={`ZMW ${(payrollSummary.totalOtherDeductions || 0).toLocaleString()}`} />
-                <SummaryCard label="Total Deductions" value={`ZMW ${(payrollSummary.totalDeductions || 0).toLocaleString()}`} />
-                <SummaryCard label="Total Net Salary" value={`ZMW ${(payrollSummary.totalNetSalary || 0).toLocaleString()}`}
-                  highlight />
+              <Grid container spacing={2}>
+                <StatCard
+                  label="Total Employees"
+                  value={payrollSummary.totalEmployees || 0}
+                  icon={<People sx={{ color: '#2563eb', fontSize: 20 }} />}
+                  color="#2563eb"
+                />
+                <StatCard
+                  label="Total NHIMA"
+                  value={formatCurrency(payrollSummary.totalNhima)}
+                  icon={<TrendingDown sx={{ color: '#d97706', fontSize: 20 }} />}
+                  color="#d97706"
+                />
+                <StatCard
+                  label="Total NAPSA"
+                  value={formatCurrency(payrollSummary.totalNapsa)}
+                  icon={<TrendingDown sx={{ color: '#d97706', fontSize: 20 }} />}
+                  color="#d97706"
+                />
+                <StatCard
+                  label="Total Loan Deductions"
+                  value={formatCurrency(payrollSummary.totalLoanDeductions)}
+                  icon={<MoneyOff sx={{ color: '#dc2626', fontSize: 20 }} />}
+                  color="#dc2626"
+                />
+                <StatCard
+                  label="Total Other Deductions"
+                  value={formatCurrency(payrollSummary.totalOtherDeductions)}
+                  icon={<MoneyOff sx={{ color: '#dc2626', fontSize: 20 }} />}
+                  color="#dc2626"
+                />
+                <StatCard
+                  label="Total Deductions"
+                  value={formatCurrency(payrollSummary.totalDeductions)}
+                  icon={<TrendingDown sx={{ color: '#dc2626', fontSize: 20 }} />}
+                  color="#dc2626"
+                />
+                <StatCard
+                  label="Total Net Salary"
+                  value={formatCurrency(payrollSummary.totalNetSalary)}
+                  icon={<AccountBalance sx={{ color: '#059669', fontSize: 20 }} />}
+                  color="#059669"
+                />
               </Grid>
             )
           )}
 
+          {/* Expense Report */}
           {tab === 'expenses' && (
             expenseLoading ? <LoadingScreen /> : !expenseReport ? (
-              <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>No data</Typography>
-            ) : (
-              <Box>
-                <Grid container spacing={3}>
-                  <SummaryCard label="Total Expenses" value={`ZMW ${(expenseReport.totalExpenses || 0).toLocaleString()}`} highlight />
-                  <SummaryCard label="Expense Count" value={expenseReport.expenseCount || 0} />
-                </Grid>
+              <Box sx={{ textAlign: 'center', py: 6 }}>
+                <Receipt sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+                <Typography variant="h6" color="text.secondary" gutterBottom>
+                  No Expense Data
+                </Typography>
+                <Typography variant="body2" color="text.disabled">
+                  No expenses recorded for this period
+                </Typography>
               </Box>
+            ) : (
+              <Grid container spacing={2}>
+                <StatCard
+                  label="Total Expenses"
+                  value={formatCurrency(expenseReport.totalExpenses)}
+                  icon={<AccountBalance sx={{ color: '#059669', fontSize: 20 }} />}
+                  color="#059669"
+                />
+                <StatCard
+                  label="Expense Count"
+                  value={expenseReport.expenseCount || 0}
+                  icon={<Description sx={{ color: '#2563eb', fontSize: 20 }} />}
+                  color="#2563eb"
+                />
+              </Grid>
             )
           )}
         </CardContent>
       </Card>
     </Box>
-  );
-}
-
-function SummaryCard({ label, value, highlight }) {
-  return (
-    <Grid item xs={12} sm={6} md={3}>
-      <Card variant="outlined" sx={{
-        bgcolor: highlight ? 'primary.main' : 'background.paper',
-        color: highlight ? 'white' : 'text.primary',
-      }}>
-        <CardContent>
-          <Typography variant="body2" sx={{ mb: 1, opacity: 0.8 }}>{label}</Typography>
-          <Typography variant="h5" fontWeight={700}>{value}</Typography>
-        </CardContent>
-      </Card>
-    </Grid>
   );
 }

@@ -4,8 +4,8 @@ import com.payroll.entity.*;
 import com.payroll.exception.BusinessRuleException;
 import com.payroll.exception.ResourceNotFoundException;
 import com.payroll.repository.*;
+import com.payroll.service.AuditService;
 import com.payroll.service.FileStorageService;
-import com.payroll.service.PayrollCalculationService;
 import com.payroll.service.PayrollImportService;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.*;
@@ -35,7 +35,7 @@ public class PayrollImportServiceImpl implements PayrollImportService {
     private final PayrollSettingsRepository payrollSettingsRepository;
     private final LoanRepository loanRepository;
     private final FileStorageService fileStorageService;
-    private final PayrollCalculationService payrollCalculationService;
+    private final AuditService auditService;
 
     @Override
     @Transactional
@@ -183,23 +183,112 @@ public class PayrollImportServiceImpl implements PayrollImportService {
                         employeeRepository.save(employee);
                     }
 
-                    BigDecimal presentDays = getNumericCellValue(row.getCell(14));  // PRESENT DAYS (col O)
-                    BigDecimal overtimeHrs = getNumericCellValue(row.getCell(16));  // OVERT TIME (col Q)
-                    BigDecimal holidayHrs = getNumericCellValue(row.getCell(18));   // HOLIDAY OVER TIME (col S)
-                    BigDecimal otherDeduction = getNumericCellValue(row.getCell(25));// OTHER DEDUCTION (col Z)
+                    // ── Read ALL imported values from the Excel file ──
+                    BigDecimal presentDays = getNumericCellValue(row.getCell(14));    // PRESENT DAYS (col O)
+                    BigDecimal presentAmount = getNumericCellValue(row.getCell(15));  // PRESENT AMOUNT (col P)
+                    BigDecimal overtimeHrs = getNumericCellValue(row.getCell(16));    // OVERT TIME (col Q)
+                    BigDecimal overtimeAmt = getNumericCellValue(row.getCell(17));   // OVER TIME AMOUNT (col R)
+                    BigDecimal holidayHrs = getNumericCellValue(row.getCell(18));     // HOLIDAY OVER TIME (col S)
+                    BigDecimal holidayAmt = getNumericCellValue(row.getCell(19));    // HOLIDAY OVER TIME AMOUNT (col T)
+                    BigDecimal grossSalary = getNumericCellValue(row.getCell(20));   // GROSS SALARY (col U)
+                    BigDecimal nhima = getNumericCellValue(row.getCell(21));          // NHIMA (col V)
+                    BigDecimal napsa = getNumericCellValue(row.getCell(22));          // NAPSA (col W)
+                    BigDecimal importedLoanBalance = getNumericCellValue(row.getCell(23)); // SOFT LOAN (col X)
+                    BigDecimal loanDeduction = getNumericCellValue(row.getCell(24));  // SOFT LOAN DEDUCTION (col Y)
+                    BigDecimal otherDeduction = getNumericCellValue(row.getCell(25)); // OTHER DEDUCTION (col Z)
+                    BigDecimal netSalary = getNumericCellValue(row.getCell(26));      // NET PAY (col AA)
 
-                    // Get active loans for this employee
-                    List<Loan> activeLoans = loanRepository.findByEmployeeIdAndStatus(employee.getId(), LoanStatus.ACTIVE);
+                    // Calculate derived fields for record-keeping
+                    BigDecimal hourlyRate = employee.getRate() != null ? employee.getRate() : BigDecimal.ZERO;
+                    BigDecimal normalHrsPerDay = BigDecimal.valueOf(settings.getHoursPerDay());
+                    BigDecimal regularHours = normalHrsPerDay.multiply(presentDays);
+                    BigDecimal monthlyEquivalent = hourlyRate.multiply(
+                            BigDecimal.valueOf(settings.getHoursPerDay() * settings.getWorkingDaysPerMonth()));
 
-                    PayrollEntry entry = payrollCalculationService.calculatePayrollEntry(
-                            employee, settings,
-                            overtimeHrs, holidayHrs,
-                            activeLoans, otherDeduction,
-                            presentDays);
+                    // Build PayrollEntry directly from imported values
+                    PayrollEntry entry = PayrollEntry.builder()
+                            .basicSalary(monthlyEquivalent)
+                            .hourlyRate(hourlyRate)
+                            .presentDays(presentDays)
+                            .loanBalance(importedLoanBalance)
+                            .site(employee.getSite())
+                            .regularHours(regularHours)
+                            .regularAmount(presentAmount)
+                            .overtimeHours(overtimeHrs)
+                            .overtimeAmount(overtimeAmt)
+                            .holidayHours(holidayHrs)
+                            .holidayAmount(holidayAmt)
+                            .grossSalary(grossSalary)
+                            .nhima(nhima)
+                            .napsa(napsa)
+                            .paye(BigDecimal.ZERO)
+                            .loanDeduction(loanDeduction)
+                            .otherDeductions(otherDeduction)
+                            .netSalary(netSalary)
+                            .build();
                     entry.setPayrollRun(payrollRun);
                     entry.setEmployee(employee);
 
                     payrollEntryRepository.save(entry);
+
+                    // ── Update loan balances from imported deductions ──
+                    if (loanDeduction.compareTo(BigDecimal.ZERO) > 0) {
+                        List<Loan> activeLoans = loanRepository.findByEmployeeIdAndStatus(
+                                employee.getId(), LoanStatus.ACTIVE);
+
+                        if (!activeLoans.isEmpty()) {
+                            // Deduct from existing active loans
+                            BigDecimal remainingDeduction = loanDeduction;
+                            for (Loan loan : activeLoans) {
+                                if (remainingDeduction.compareTo(BigDecimal.ZERO) <= 0) break;
+
+                                BigDecimal actualDeduction = remainingDeduction.min(loan.getBalance());
+                                BigDecimal newBalance = loan.getBalance().subtract(actualDeduction)
+                                        .max(BigDecimal.ZERO);
+
+                                loan.setBalance(newBalance);
+                                if (newBalance.compareTo(BigDecimal.ZERO) <= 0) {
+                                    loan.setStatus(LoanStatus.COMPLETED);
+                                }
+
+                                loanRepository.save(loan);
+                                remainingDeduction = remainingDeduction.subtract(actualDeduction);
+                            }
+
+                            auditService.logEvent(userId, "LOAN_DEDUCTION", "Loan",
+                                    employee.getId().toString(),
+                                    null,
+                                    String.format("Imported payroll deducted ZMW %.2f from employee %s %s's loans",
+                                            loanDeduction, employee.getFirstName(), employee.getLastName()),
+                                    null);
+                        } else {
+                            // No active loan exists — create a historical record marked as paid.
+                            BigDecimal loanBalance = (importedLoanBalance != null
+                                    && importedLoanBalance.compareTo(BigDecimal.ZERO) > 0)
+                                    ? importedLoanBalance : loanDeduction;
+
+                            Loan newLoan = Loan.builder()
+                                    .employee(employee)
+                                    .loanAmount(loanBalance)
+                                    .balance(BigDecimal.ZERO)
+                                    .interestRate(BigDecimal.ZERO)
+                                    .monthlyDeduction(loanDeduction)
+                                    .durationMonths(1)
+                                    .startDate(LocalDate.now())
+                                    .endDate(LocalDate.now())
+                                    .status(LoanStatus.COMPLETED)
+                                    .build();
+                            loanRepository.save(newLoan);
+
+                            auditService.logEvent(userId, "LOAN_CREATED", "Loan",
+                                    employee.getId().toString(),
+                                    null,
+                                    String.format("Loan created from payroll import: ZMW %.2f for employee %s %s",
+                                            loanBalance, employee.getFirstName(), employee.getLastName()),
+                                    null);
+                        }
+                    }
+
                     successRows++;
 
                 } catch (Exception e) {
@@ -213,7 +302,6 @@ public class PayrollImportServiceImpl implements PayrollImportService {
             payrollImport.setStatus(ImportStatus.IMPORTED);
 
         } catch (Exception e) {
-            // Transaction rolls back on RuntimeException, import stays as UPLOADED
             throw new RuntimeException("Failed to process import file", e);
         }
 
@@ -258,73 +346,45 @@ public class PayrollImportServiceImpl implements PayrollImportService {
                     "OTHER DEDUCTION", "NET PAY"
             };
 
-            Row headerRow = sheet.createRow(2);  // Index 2 (Excel Row 3) — header row matching template format
+            Row headerRow = sheet.createRow(2);
             for (int i = 0; i < headers.length; i++) {
                 Cell cell = headerRow.createCell(i);
                 cell.setCellValue(headers[i]);
                 cell.setCellStyle(headerStyle);
             }
 
-            // Example data row with input values and formulas
-            int dataRowIdx = 4;  // Excel row 4 (0-indexed row 3) = first example data row
+            int dataRowIdx = 4;
             Row exampleRow = sheet.createRow(3);
 
-            // Input values the user should fill in
-            exampleRow.createCell(0).setCellValue(1);               // A: S/N
-            exampleRow.createCell(1).setCellValue("EMP001");        // B: EMPLOYEE NUMBER
-            exampleRow.createCell(2).setCellValue("JOHN DOE");     // C: NAMES
-            exampleRow.createCell(3).setCellValue("123456/78/1");  // D: NRC
-            exampleRow.createCell(4).setCellValue("FITTER");       // E: JOB TITTLE
-            exampleRow.createCell(5).setCellValue("KITWE");        // F: SITE
-            exampleRow.createCell(6).setCellValue("0977000000");   // G: PHONE NUMBER
-            exampleRow.createCell(7).setCellValue("john@example.com"); // H: EMAIL
-            exampleRow.createCell(8).setCellValue("1234567890");   // I: ACCOUNT NUMBER
-            exampleRow.createCell(9).setCellValue("010101");       // J: SORT CODE
-            exampleRow.createCell(10).setCellValue(35.0);           // K: RATE/HRS
-            exampleRow.createCell(11).setCellValue(8.0);            // L: NORMAL WORKING HRS
-
-            // Formulas — OVER TIME RATE = RATE/HRS * 1.5
+            exampleRow.createCell(0).setCellValue(1);
+            exampleRow.createCell(1).setCellValue("EMP001");
+            exampleRow.createCell(2).setCellValue("JOHN DOE");
+            exampleRow.createCell(3).setCellValue("123456/78/1");
+            exampleRow.createCell(4).setCellValue("FITTER");
+            exampleRow.createCell(5).setCellValue("KITWE");
+            exampleRow.createCell(6).setCellValue("0977000000");
+            exampleRow.createCell(7).setCellValue("john@example.com");
+            exampleRow.createCell(8).setCellValue("1234567890");
+            exampleRow.createCell(9).setCellValue("010101");
+            exampleRow.createCell(10).setCellValue(35.0);
+            exampleRow.createCell(11).setCellValue(8.0);
             exampleRow.createCell(12).setCellFormula("K" + dataRowIdx + "*1.5");
-
-            // Formulas — HOLIDAY OVERTIME RATE = RATE/HRS * 2
             exampleRow.createCell(13).setCellFormula("K" + dataRowIdx + "*2");
-
-            exampleRow.createCell(14).setCellValue(26.0);           // O: PRESENT DAYS
-
-            // Formulas — PRESENT AMOUNT = RATE/HRS * NORMAL WORKING HRS * PRESENT DAYS
+            exampleRow.createCell(14).setCellValue(26.0);
             exampleRow.createCell(15).setCellFormula("K" + dataRowIdx + "*L" + dataRowIdx + "*O" + dataRowIdx);
-
-            exampleRow.createCell(16).setCellValue(10.0);           // Q: OVERT TIME
-
-            // Formulas — OVER TIME AMOUNT = OVERT TIME * OVER TIME RATE
+            exampleRow.createCell(16).setCellValue(10.0);
             exampleRow.createCell(17).setCellFormula("Q" + dataRowIdx + "*M" + dataRowIdx);
-
-            exampleRow.createCell(18).setCellValue(5.0);            // S: HOLIDAY OVER TIME
-
-            // Formulas — HOLIDAY OVER TIME AMOUNT = HOLIDAY OVER TIME * HOLIDAY OVERTIME RATE
+            exampleRow.createCell(18).setCellValue(5.0);
             exampleRow.createCell(19).setCellFormula("S" + dataRowIdx + "*N" + dataRowIdx);
-
-            // Formulas — GROSS SALARY = PRESENT AMOUNT + OVER TIME AMOUNT + HOLIDAY OVER TIME AMOUNT
             exampleRow.createCell(20).setCellFormula("P" + dataRowIdx + "+R" + dataRowIdx + "+T" + dataRowIdx);
-
-            // Formulas — NHIMA = GROSS SALARY * 1%
             exampleRow.createCell(21).setCellFormula("U" + dataRowIdx + "*1%");
-
-            // Formulas — NAPSA = GROSS SALARY * 5%
             exampleRow.createCell(22).setCellFormula("U" + dataRowIdx + "*5%");
-
-            exampleRow.createCell(23).setCellValue(1000.0);         // X: SOFT LOAN
-
-            // Formulas — SOFT LOAN DEDUCTION = SOFT LOAN * 0.3 + SOFT LOAN
+            exampleRow.createCell(23).setCellValue(1000.0);
             exampleRow.createCell(24).setCellFormula("X" + dataRowIdx + "*0.3+X" + dataRowIdx);
-
-            exampleRow.createCell(25).setCellValue(0.0);            // Z: OTHER DEDUCTION
-
-            // Formulas — NET PAY = GROSS SALARY - NHIMA - NAPSA - SOFT LOAN DEDUCTION - OTHER DEDUCTION
+            exampleRow.createCell(25).setCellValue(0.0);
             exampleRow.createCell(26).setCellFormula("U" + dataRowIdx + "-V" + dataRowIdx + "-W" + dataRowIdx + "-Y" + dataRowIdx + "-Z" + dataRowIdx);
 
-            // Add a totals row (sums only the data rows, not itself)
-            Row totalRow = sheet.createRow(4);  // Excel row 5 (0-indexed row 4)
+            Row totalRow = sheet.createRow(4);
             Cell totalLabel = totalRow.createCell(0);
             totalLabel.setCellValue("TOTALS");
             CellStyle totalStyle = workbook.createCellStyle();
@@ -333,12 +393,10 @@ public class PayrollImportServiceImpl implements PayrollImportService {
             totalStyle.setFont(totalFont);
             totalLabel.setCellStyle(totalStyle);
 
-            // Sum formula for NET PAY totals column (only data rows, excludes totals row)
             Cell totalNetPay = totalRow.createCell(26);
             totalNetPay.setCellFormula("SUM(AA4:AA4)");
             totalNetPay.setCellStyle(totalStyle);
 
-            // Auto-size columns
             for (int i = 0; i < headers.length; i++) {
                 sheet.autoSizeColumn(i);
             }
@@ -370,6 +428,15 @@ public class PayrollImportServiceImpl implements PayrollImportService {
                 } catch (NumberFormatException e) {
                     yield BigDecimal.ZERO;
                 }
+            }
+            case FORMULA -> {
+                try {
+                    if (cell.getCachedFormulaResultType() == CellType.NUMERIC) {
+                        yield BigDecimal.valueOf(cell.getNumericCellValue()).setScale(2, RoundingMode.HALF_UP);
+                    }
+                } catch (Exception e) {
+                }
+                yield BigDecimal.ZERO;
             }
             default -> BigDecimal.ZERO;
         };

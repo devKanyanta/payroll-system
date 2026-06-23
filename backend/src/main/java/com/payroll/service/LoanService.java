@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 public interface LoanService {
+    List<LoanResponse> getAllLoans();
     List<LoanResponse> getLoansByEmployee(UUID employeeId);
     LoanResponse getLoanById(UUID id);
     LoanResponse createLoan(LoanRequest request);

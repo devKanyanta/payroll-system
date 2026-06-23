@@ -41,6 +41,11 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     long countActiveEmployees();
 
     @Query("SELECT e FROM Employee e WHERE e.status = 'ACTIVE' AND e.id NOT IN " +
-           "(SELECT pe.employee.id FROM PayrollEntry pe WHERE pe.payrollRun.id = :payrollRunId)")
-    List<Employee> findActiveEmployeesNotInPayrollRun(@Param("payrollRunId") UUID payrollRunId);
+           "(SELECT pe.employee.id FROM PayrollEntry pe WHERE pe.payrollRun.id = :payrollRunId) " +
+           "AND (:departmentId IS NULL OR e.department.id = :departmentId)")
+    List<Employee> findActiveEmployeesNotInPayrollRun(@Param("payrollRunId") UUID payrollRunId,
+                                                      @Param("departmentId") UUID departmentId);
+
+    @Query("SELECT d.name AS department, COUNT(e) AS count FROM Employee e JOIN e.department d WHERE e.status = 'ACTIVE' GROUP BY d.name ORDER BY COUNT(e) DESC")
+    List<Object[]> countActiveByDepartment();
 }

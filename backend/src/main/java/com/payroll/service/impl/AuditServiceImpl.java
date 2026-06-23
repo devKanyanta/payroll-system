@@ -23,25 +23,36 @@ public class AuditServiceImpl implements AuditService {
 
     @Override
     @Transactional
-    public void logEvent(UUID userId, String action, String entityName, String entityId, String oldValue, String newValue, String ipAddress) {
+    public void logEvent(UUID userId, String action, String entityName,
+                         String entityId, String previousState,
+                         String newState, String notes) {
         User user = userId != null ? userRepository.findById(userId).orElse(null) : null;
 
-        AuditLog auditLog = AuditLog.builder()
+        AuditLog log = AuditLog.builder()
                 .user(user)
                 .action(action)
                 .entityName(entityName)
                 .entityId(entityId)
-                .oldValue(oldValue)
-                .newValue(newValue)
-                .ipAddress(ipAddress)
+                .previousState(previousState)
+                .newState(newState)
+                .notes(notes)
+                .timestamp(LocalDateTime.now())
                 .build();
 
-        auditLogRepository.save(auditLog);
+        auditLogRepository.save(log);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<AuditLog> searchAuditLogs(UUID userId, String entityName, String action, LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
-        return auditLogRepository.searchAuditLogs(userId, entityName, action, startDate, endDate, pageable);
+    public Page<AuditLog> searchAuditLogs(UUID userId, String entityName, String action,
+                                           LocalDateTime startDate, LocalDateTime endDate,
+                                           Pageable pageable) {
+        return auditLogRepository.searchAuditLogs(
+                userId,
+                entityName != null ? entityName : "",
+                action != null ? action : "",
+                startDate,
+                endDate,
+                pageable);
     }
 }

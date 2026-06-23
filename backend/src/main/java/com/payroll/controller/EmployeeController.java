@@ -9,10 +9,13 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -42,8 +45,7 @@ public class EmployeeController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<EmployeeResponse> updateEmployee(
-            @PathVariable UUID id, @Valid @RequestBody EmployeeRequest request) {
+    public ResponseEntity<EmployeeResponse> updateEmployee(@PathVariable UUID id, @Valid @RequestBody EmployeeRequest request) {
         return ResponseEntity.ok(employeeService.updateEmployee(id, request));
     }
 
@@ -53,13 +55,15 @@ public class EmployeeController {
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/next-number")
-    public ResponseEntity<String> getNextEmployeeNumber() {
-        return ResponseEntity.ok(employeeService.generateEmployeeNumber());
+    @GetMapping("/available-for-run/{payrollRunId}")
+    public ResponseEntity<List<EmployeeResponse>> getActiveEmployeesNotInPayrollRun(
+            @PathVariable UUID payrollRunId,
+            @RequestParam(required = false) UUID departmentId) {
+        return ResponseEntity.ok(employeeService.getActiveEmployeesNotInPayrollRun(payrollRunId, departmentId));
     }
 
-    @GetMapping("/available-for-run/{payrollRunId}")
-    public ResponseEntity<List<EmployeeResponse>> getActiveEmployeesNotInPayrollRun(@PathVariable UUID payrollRunId) {
-        return ResponseEntity.ok(employeeService.getActiveEmployeesNotInPayrollRun(payrollRunId));
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<Map<String, Object>> importEmployees(@RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(employeeService.importEmployees(file));
     }
 }

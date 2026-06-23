@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Box, Typography, Button, Card, CardContent, Alert,
+  Box, Typography, Button, Card, CardContent, Alert, Stack, alpha,
   Stepper, Step, StepLabel, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Select, MenuItem,
-  FormControl, InputLabel, LinearProgress,
+  FormControl, InputLabel, LinearProgress, Chip,
 } from '@mui/material';
-import { CloudUpload, CheckCircle, PlayArrow, Download } from '@mui/icons-material';
+import {
+  CloudUpload, CheckCircle, PlayArrow, Download, Description, UploadFile,
+} from '@mui/icons-material';
 import { payrollRunService } from '../services/payrollRunService';
 import apiService from '../services/api';
 import dayjs from 'dayjs';
@@ -97,47 +99,86 @@ export default function PayrollImport() {
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 0.5 }}>Payroll Import</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Import employee payroll data from an Excel file using the PAYROLL TEMPLATE format.
-        Download the template below to get started.
-      </Typography>
+      {/* ── Header ── */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, flexWrap: 'wrap', gap: 1 }}>
+        <Box>
+          <Typography variant="h4" sx={{ fontWeight: 800 }}>Payroll Import</Typography>
+          <Typography variant="body2" color="text.secondary">
+            Import employee payroll data from an Excel file using the PAYROLL TEMPLATE format
+          </Typography>
+        </Box>
+      </Box>
 
       <Card sx={{ mb: 3 }}>
         <CardContent>
-          <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-            {steps.map((label) => (
-              <Step key={label}><StepLabel>{label}</StepLabel></Step>
+          <Stepper activeStep={activeStep} sx={{ mb: 4, mt: 1 }}>
+            {steps.map((label, idx) => (
+              <Step key={label}>
+                <StepLabel
+                  optional={
+                    <Typography variant="caption" color="text.disabled">
+                      {idx === 0 ? 'choose run' : idx === 1 ? 'upload' : idx === 2 ? 'verify' : idx === 3 ? 'results' : 'done'}
+                    </Typography>
+                  }
+                >
+                  {label}
+                </StepLabel>
+              </Step>
             ))}
           </Stepper>
 
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+              {error}
+            </Alert>
+          )}
 
+          {/* ── Step 0: Download Template & Select Run ── */}
           {activeStep === 0 && (
             <Box>
-              <Box sx={{ textAlign: 'center', py: 2, mb: 3, borderBottom: 1, borderColor: 'divider' }}>
-                <Download sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-                <Typography variant="h6" sx={{ mb: 1 }}>
-                  Step 1: Download the Template
+              <Box sx={{ textAlign: 'center', py: 3, mb: 3 }}>
+                <Box sx={{
+                  width: 80, height: 80, borderRadius: 2,
+                  bgcolor: alpha('#2563eb', 0.1),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  mx: 'auto', mb: 2.5,
+                }}>
+                  <Description sx={{ fontSize: 40, color: '#2563eb' }} />
+                </Box>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                  Step 1: Download the Payroll Template
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2, maxWidth: 600, mx: 'auto' }}>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 540, mx: 'auto', lineHeight: 1.6 }}>
                   Download the PAYROLL TEMPLATE (.xlsx), fill in your employee payroll data,
                   then upload it in the next steps.
                 </Typography>
                 <Button
                   variant="contained"
+                  size="large"
                   startIcon={<Download />}
                   onClick={handleDownloadTemplate}
-                  sx={{ mb: 2 }}
+                  sx={{ mb: 3, px: 4, py: 1.2 }}
                 >
                   Download Template
                 </Button>
-                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
-                  The template includes columns for employee info (names, NRC, employee number, job title, site,
-                  phone, email, bank details) and payroll calculation fields (rate, present days, overtime, etc.).
-                </Typography>
+                <Box sx={{
+                  maxWidth: 500, mx: 'auto', p: 2,
+                  bgcolor: alpha('#2563eb', 0.04),
+                  borderRadius: 2,
+                  border: '1px solid', borderColor: alpha('#2563eb', 0.1),
+                  textAlign: 'left',
+                }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.8 }}>
+                    <strong>Template columns:</strong><br />
+                    Employee info (names, NRC, employee number, job title, site, phone, email, bank details)
+                    and payroll calculation fields (rate, present days, overtime, etc.)
+                  </Typography>
+                </Box>
               </Box>
 
+              <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 2 }}>
+                Step 2: Select a Draft Payroll Run
+              </Typography>
               <FormControl fullWidth sx={{ mb: 3 }}>
                 <InputLabel>Payroll Run (Draft)</InputLabel>
                 <Select
@@ -151,114 +192,191 @@ export default function PayrollImport() {
                   ))}
                 </Select>
               </FormControl>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Step 2: Select the payroll run and proceed to upload your completed file.
-              </Typography>
-              <Button variant="contained" disabled={!selectedRunId}
-                onClick={() => setActiveStep(1)}>
-                Next: Upload File
-              </Button>
+
+              <Stack direction="row" spacing={2} justifyContent="flex-end">
+                <Button variant="contained" disabled={!selectedRunId}
+                  onClick={() => setActiveStep(1)} sx={{ px: 3 }}>
+                  Next — Upload File
+                </Button>
+              </Stack>
             </Box>
           )}
 
+          {/* ── Step 1: Upload File ── */}
           {activeStep === 1 && (
             <Box sx={{ textAlign: 'center', py: 4 }}>
-              <input
-                accept=".xlsx,.xls,.csv"
-                style={{ display: 'none' }}
-                id="file-upload"
-                type="file"
-                onChange={(e) => setFile(e.target.files[0])}
-              />
-              <label htmlFor="file-upload">
-                <Button variant="outlined" component="span" startIcon={<CloudUpload />} sx={{ mb: 2 }}>
-                  Choose File
-                </Button>
-              </label>
-              {file && (
-                <Typography variant="body2" sx={{ mb: 2 }}>
-                  Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
-                </Typography>
-              )}
-              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
-                Upload a file in the PAYROLL TEMPLATE format (.xlsx) with employee payroll data
+              <Box sx={{
+                width: 80, height: 80, borderRadius: 2,
+                bgcolor: alpha('#0891b2', 0.1),
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                mx: 'auto', mb: 2.5,
+              }}>
+                <UploadFile sx={{ fontSize: 40, color: '#0891b2' }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                Upload Your Completed File
               </Typography>
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
-                <Button onClick={() => setActiveStep(0)}>Back</Button>
-                <Button variant="contained" disabled={!file || uploading} onClick={handleUpload}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                Select the completed PAYROLL TEMPLATE (.xlsx) from your computer
+              </Typography>
+
+              {/* Drop zone */}
+              <Box
+                sx={{
+                  border: '2px dashed',
+                  borderColor: file ? alpha('#2563eb', 0.4) : alpha('#6b7280', 0.25),
+                  borderRadius: 2, p: 4, mb: 3, maxWidth: 480, mx: 'auto',
+                  cursor: 'pointer', transition: 'all 0.2s',
+                  bgcolor: file ? alpha('#2563eb', 0.04) : 'transparent',
+                  '&:hover': { borderColor: '#2563eb', bgcolor: alpha('#2563eb', 0.04) },
+                }}
+                onClick={() => document.getElementById('file-upload').click()}
+              >
+                <input
+                  accept=".xlsx,.xls,.csv"
+                  style={{ display: 'none' }}
+                  id="file-upload"
+                  type="file"
+                  onChange={(e) => setFile(e.target.files[0])}
+                />
+                <CloudUpload sx={{ fontSize: 40, color: file ? '#2563eb' : 'text.disabled', mb: 1 }} />
+                {file ? (
+                  <Box>
+                    <Typography variant="body2" fontWeight={600} color="primary">
+                      {file.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {(file.size / 1024).toFixed(1)} KB
+                    </Typography>
+                  </Box>
+                ) : (
+                  <Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Drop your file here, or <Typography component="span" color="primary" variant="body2" sx={{ textDecoration: 'underline', cursor: 'pointer' }}>browse</Typography>
+                    </Typography>
+                    <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: 'block' }}>
+                      Only .xlsx files are supported
+                    </Typography>
+                  </Box>
+                )}
+              </Box>
+
+              <Stack direction="row" spacing={2} justifyContent="center">
+                <Button onClick={() => setActiveStep(0)} variant="outlined">Back</Button>
+                <Button variant="contained" disabled={!file || uploading} onClick={handleUpload} startIcon={<CloudUpload />}>
                   {uploading ? 'Uploading...' : 'Upload & Validate'}
                 </Button>
-              </Box>
+              </Stack>
               {uploading && <LinearProgress sx={{ mt: 2 }} />}
             </Box>
           )}
 
+          {/* ── Step 2: Review Results ── */}
           {activeStep === 2 && importResult && (
-            <Box>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                File uploaded successfully. Click "Process Import" to parse the file and create payroll entries.
+            <Box sx={{ py: 2 }}>
+              <Alert severity="info" icon={<CloudUpload fontSize="small" />} sx={{ mb: 3 }}>
+                <Typography variant="body2">
+                  <strong>{importResult.fileName}</strong> uploaded successfully. Click "Process Import" below to parse the file and create payroll entries.
+                </Typography>
               </Alert>
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                File: {importResult.fileName}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                <Button onClick={reset}>Cancel</Button>
-                <Button variant="contained" onClick={handleProcess} disabled={processing}
-                  startIcon={<PlayArrow />}>
+
+              <Stack direction="row" spacing={2} justifyContent="flex-end">
+                <Button onClick={reset} variant="outlined">Cancel</Button>
+                <Button
+                  variant="contained"
+                  onClick={handleProcess}
+                  disabled={processing}
+                  startIcon={processing ? undefined : <PlayArrow />}
+                  sx={{ px: 3 }}
+                >
                   {processing ? 'Processing...' : 'Process Import'}
                 </Button>
-              </Box>
-              {processing && <LinearProgress sx={{ mt: 2 }} />}
+              </Stack>
+              {processing && (
+                <Box sx={{ mt: 2 }}>
+                  <LinearProgress />
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                    Processing payroll data...
+                  </Typography>
+                </Box>
+              )}
             </Box>
           )}
 
+          {/* ── Step 3: Import Results ── */}
           {activeStep === 3 && processingResult && (
-            <Box>
+            <Box sx={{ py: 2 }}>
               <Alert
                 severity={processingResult.errorRows > 0 ? 'warning' : 'success'}
-                sx={{ mb: 2 }}
-                action={
-                  <Button color="inherit" size="small" onClick={() => setActiveStep(4)}>
-                    View Summary
-                  </Button>
-                }
+                sx={{ mb: 3 }}
               >
-                {processingResult.totalRows} rows processed: {processingResult.successRows} imported, {processingResult.errorRows} with errors
+                <Box>
+                  <Typography variant="body2" fontWeight={600}>
+                    {processingResult.totalRows} rows processed
+                  </Typography>
+                  <Stack direction="row" spacing={1.5} sx={{ mt: 0.5 }} flexWrap="wrap">
+                    <Chip
+                      label={`${processingResult.successRows} imported`}
+                      size="small"
+                      sx={{ color: '#059669', bgcolor: '#d1fae5', fontWeight: 600, fontSize: '0.75rem' }}
+                    />
+                    {processingResult.errorRows > 0 && (
+                      <Chip
+                        label={`${processingResult.errorRows} with errors`}
+                        size="small"
+                        sx={{ color: '#dc2626', bgcolor: '#fee2e2', fontWeight: 600, fontSize: '0.75rem' }}
+                      />
+                    )}
+                  </Stack>
+                </Box>
               </Alert>
 
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                <Button onClick={reset}>Import Another File</Button>
+              <Stack direction="row" spacing={2} justifyContent="flex-end">
+                <Button onClick={reset} variant="outlined">Import Another File</Button>
                 <Button variant="contained" color="success" startIcon={<CheckCircle />}
-                  onClick={() => setActiveStep(4)}>
+                  onClick={() => setActiveStep(4)} sx={{ px: 3 }}>
                   Complete
                 </Button>
-              </Box>
+              </Stack>
             </Box>
           )}
 
+          {/* ── Step 4: Complete ── */}
           {activeStep === 4 && (
             <Box sx={{ textAlign: 'center', py: 4 }}>
-              <CheckCircle sx={{ fontSize: 64, color: 'success.main', mb: 2 }} />
-              <Typography variant="h6">Import Completed Successfully</Typography>
+              <Box sx={{
+                width: 80, height: 80, borderRadius: '50%',
+                bgcolor: alpha('#059669', 0.12),
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                mx: 'auto', mb: 2.5,
+              }}>
+                <CheckCircle sx={{ fontSize: 40, color: '#059669' }} />
+              </Box>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                Import Completed Successfully
+              </Typography>
               {processingResult && (
-                <Typography color="text.secondary" sx={{ mb: 1 }}>
+                <Typography color="text.secondary" sx={{ mb: 0.5 }}>
                   {processingResult.successRows} employee{processingResult.successRows !== 1 ? 's' : ''} added to payroll
                 </Typography>
               )}
               {processingResult?.errorRows > 0 && (
                 <Typography color="warning.main" variant="body2" sx={{ mb: 2 }}>
-                  {processingResult.errorRows} row{processingResult.errorRows !== 1 ? 's' : ''} could not be processed (unmatched employees or duplicates)
+                  {processingResult.errorRows} row{processingResult.errorRows !== 1 ? 's' : ''} could not be processed
+                  (unmatched employees or duplicates)
                 </Typography>
               )}
-              <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 2 }}>
+              <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 3 }}>
                 <Button variant="outlined" onClick={() => {
                   reset();
                   window.location.href = `/payroll-runs/${selectedRunId}`;
                 }}>
                   View Payroll Run
                 </Button>
-                <Button variant="contained" onClick={reset}>Import Another File</Button>
-              </Box>
+                <Button variant="contained" onClick={reset} sx={{ px: 3 }}>
+                  Import Another File
+                </Button>
+              </Stack>
             </Box>
           )}
         </CardContent>

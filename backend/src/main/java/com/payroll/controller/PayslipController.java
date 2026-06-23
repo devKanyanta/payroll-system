@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -47,5 +48,19 @@ public class PayslipController {
     public ResponseEntity<Void> emailPayslip(@PathVariable UUID id) {
         payslipService.emailPayslip(id);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/download-zip/{payrollRunId}")
+    public ResponseEntity<byte[]> downloadPayslipsZip(@PathVariable UUID payrollRunId) {
+        byte[] zip = payslipService.downloadPayslipsZip(payrollRunId);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=payslips-" + payrollRunId + ".zip")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(zip);
+    }
+
+    @PostMapping("/email-all/{payrollRunId}")
+    public ResponseEntity<Map<String, Object>> emailAllPayslipsForRun(@PathVariable UUID payrollRunId) {
+        return ResponseEntity.ok(payslipService.emailAllPayslipsForRun(payrollRunId));
     }
 }

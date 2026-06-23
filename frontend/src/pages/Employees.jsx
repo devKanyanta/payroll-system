@@ -1,23 +1,44 @@
 import { useState } from 'react';
+import { useDebounce } from '../hooks/useDebounce';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, Button, TextField, Select, MenuItem, FormControl,
   InputLabel, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, Paper, IconButton, Chip, Card, CardContent,
+  TableRow, IconButton, Chip, Card, CardContent,
   Dialog, DialogTitle, DialogContent, DialogActions,
-  TablePagination, Grid, InputAdornment,
+  TablePagination, Grid, Stack, Tooltip, alpha,
 } from '@mui/material';
 import {
-  Add, Edit, Delete, Search, Visibility, FilterList,
+  Add, Edit, Delete, Search, Visibility, Group, Badge, Business, TrendingUp,
 } from '@mui/icons-material';
 import { employeeService } from '../services/employeeService';
 import { departmentService } from '../services/departmentService';
 import LoadingScreen from '../components/LoadingScreen';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useNavigate } from 'react-router-dom';
-import dayjs from 'dayjs';
 
-const statusColors = { ACTIVE: 'success', INACTIVE: 'warning', TERMINATED: 'error' };
+const STATUS_COLORS = {
+  ACTIVE: { color: '#059669', bg: '#d1fae5' },
+  INACTIVE: { color: '#d97706', bg: '#fef3c7' },
+  TERMINATED: { color: '#dc2626', bg: '#fee2e2' },
+};
+
+function StatusChip({ status }) {
+  const colors = STATUS_COLORS[status] || { color: '#6b7280', bg: '#f3f4f6' };
+  return (
+    <Chip
+      label={status}
+      size="small"
+      sx={{
+        fontWeight: 600,
+        fontSize: '0.75rem',
+        color: colors.color,
+        bgcolor: colors.bg,
+        textTransform: 'capitalize',
+      }}
+    />
+  );
+}
 
 const emptyEmployee = {
   firstName: '', lastName: '', email: '', phone: '', nrc: '',
@@ -30,6 +51,7 @@ export default function Employees() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebounce(search, 400);
   const [statusFilter, setStatusFilter] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -46,11 +68,11 @@ export default function Employees() {
   });
 
   const { data: pageData, isLoading } = useQuery({
-    queryKey: ['employees', page, rowsPerPage, search, statusFilter, departmentFilter],
+    queryKey: ['employees', page, rowsPerPage, debouncedSearch, statusFilter, departmentFilter],
     queryFn: async () => {
       const params = {
         page, size: rowsPerPage, sort: 'lastName,asc',
-        ...(search && { search }),
+        ...(debouncedSearch && { search: debouncedSearch }),
         ...(statusFilter && { status: statusFilter }),
         ...(departmentFilter && { departmentId: departmentFilter }),
       };
@@ -75,6 +97,11 @@ export default function Employees() {
     mutationFn: (id) => employeeService.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['employees'] }); setDeleteId(null); },
   });
+
+  // ── Derived stats ──
+  const total = pageData?.totalElements || 0;
+  const activeCount = pageData?.content?.filter((e) => e.status === 'ACTIVE').length || 0;
+  const deptCount = departments?.length || 0;
 
   const openCreate = async () => {
     setEditId(null);
@@ -124,11 +151,12 @@ export default function Employees() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      {/* ── Header ── */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3, flexWrap: 'wrap', gap: 1 }}>
         <Box>
-          <Typography variant="h4">Employees</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 800 }}>Employees</Typography>
           <Typography variant="body2" color="text.secondary">
-            {pageData?.totalElements || 0} total employees
+            Manage your workforce — add, edit, and view employee profiles
           </Typography>
         </Box>
         <Button variant="contained" startIcon={<Add />} onClick={openCreate}>
@@ -136,17 +164,104 @@ export default function Employees() {
         </Button>
       </Box>
 
+      {/* ── Summary Cards ── */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid item xs={6} sm={6} md={3}>
+          <Card sx={{ bgcolor: alpha('#2563eb', 0.08), border: '1px solid', borderColor: alpha('#2563eb', 0.2) }}>
+            <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Box sx={{
+                  width: 40, height: 40, borderRadius: 1.5,
+                  bgcolor: alpha('#2563eb', 0.12),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Group sx={{ color: '#2563eb', fontSize: 20 }} />
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" fontWeight={500}>Total</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>{total}</Typography>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={6} md={3}>
+          <Card sx={{ bgcolor: alpha('#059669', 0.08), border: '1px solid', borderColor: alpha('#059669', 0.2) }}>
+            <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Box sx={{
+                  width: 40, height: 40, borderRadius: 1.5,
+                  bgcolor: alpha('#059669', 0.12),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Badge sx={{ color: '#059669', fontSize: 20 }} />
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" fontWeight={500}>Active</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>{activeCount}</Typography>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={6} md={3}>
+          <Card>
+            <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Box sx={{
+                  width: 40, height: 40, borderRadius: 1.5,
+                  bgcolor: alpha('#6b7280', 0.08),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <Business sx={{ color: 'text.secondary', fontSize: 20 }} />
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" fontWeight={500}>Departments</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>{deptCount}</Typography>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={6} sm={6} md={3}>
+          <Card>
+            <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Box sx={{
+                  width: 40, height: 40, borderRadius: 1.5,
+                  bgcolor: alpha('#8b5cf6', 0.08),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <TrendingUp sx={{ color: '#8b5cf6', fontSize: 20 }} />
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary" fontWeight={500}>Inactive</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2 }}>{total - activeCount}</Typography>
+                </Box>
+              </Stack>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* ── Filters ── */}
       <Card sx={{ mb: 3 }}>
-        <CardContent sx={{ pb: 1 }}>
+        <CardContent sx={{ pb: '12px !important' }}>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12} sm={6} md={4}>
               <TextField
-                fullWidth placeholder="Search employees..." size="small"
+                fullWidth placeholder="Search by name, email, or NRC..." size="small"
                 value={search} onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-                InputProps={{ startAdornment: <InputAdornment position="start"><Search /></InputAdornment> }}
+                InputProps={{
+                  startAdornment: (
+                    <Box component="span" sx={{ mr: 1, display: 'flex', color: 'text.disabled' }}>
+                      <Search fontSize="small" />
+                    </Box>
+                  ),
+                }}
               />
             </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid item xs={6} sm={3} md={2}>
               <FormControl fullWidth size="small">
                 <InputLabel>Status</InputLabel>
                 <Select value={statusFilter} label="Status" onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}>
@@ -157,7 +272,7 @@ export default function Employees() {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={6} sm={3}>
+            <Grid item xs={6} sm={3} md={2}>
               <FormControl fullWidth size="small">
                 <InputLabel>Department</InputLabel>
                 <Select value={departmentFilter} label="Department" onChange={(e) => { setDepartmentFilter(e.target.value); setPage(0); }}>
@@ -168,10 +283,19 @@ export default function Employees() {
                 </Select>
               </FormControl>
             </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: { sm: 'right' } }}>
+                {total} employee{total !== 1 ? 's' : ''}
+                {statusFilter && ` · ${statusFilter.toLowerCase()}`}
+                {departmentFilter && ` · filtered by department`}
+                {debouncedSearch && ` · matching "${debouncedSearch}"`}
+              </Typography>
+            </Grid>
           </Grid>
         </CardContent>
       </Card>
 
+      {/* ── Table ── */}
       <Card>
         <TableContainer>
           <Table>
@@ -179,7 +303,7 @@ export default function Employees() {
               <TableRow>
                 <TableCell>Employee #</TableCell>
                 <TableCell>Name</TableCell>
-                <TableCell>Email</TableCell>
+                <TableCell>Email / Phone</TableCell>
                 <TableCell>Department</TableCell>
                 <TableCell>Position</TableCell>
                 <TableCell>Rate/Hr</TableCell>
@@ -189,35 +313,78 @@ export default function Employees() {
             </TableHead>
             <TableBody>
               {pageData?.content?.length === 0 ? (
-                <TableRow><TableCell colSpan={8} align="center">No employees found</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      {debouncedSearch || statusFilter || departmentFilter
+                        ? 'No employees match your filters'
+                        : 'No employees yet. Add your first employee to get started.'}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
               ) : (
                 pageData?.content?.map((emp) => (
-                  <TableRow key={emp.id} hover sx={{ cursor: 'pointer' }}>
+                  <TableRow
+                    key={emp.id}
+                    hover
+                    sx={{
+                      cursor: 'pointer',
+                      '&:last-child td': { border: 0 },
+                      ...(emp.status === 'ACTIVE' && {
+                        '&:hover': { bgcolor: alpha('#059669', 0.04) },
+                      }),
+                    }}
+                  >
                     <TableCell onClick={() => navigate(`/employees/${emp.id}`)}>
-                      <Typography variant="body2" fontWeight={500}>{emp.employeeNumber}</Typography>
+                      <Typography variant="body2" fontWeight={600} sx={{ fontFamily: 'monospace' }}>
+                        {emp.employeeNumber}
+                      </Typography>
                     </TableCell>
                     <TableCell onClick={() => navigate(`/employees/${emp.id}`)}>
-                      {emp.firstName} {emp.lastName}
+                      <Typography variant="body2" fontWeight={500}>
+                        {emp.firstName} {emp.lastName}
+                      </Typography>
                     </TableCell>
-                    <TableCell onClick={() => navigate(`/employees/${emp.id}`)}>{emp.email}</TableCell>
-                    <TableCell onClick={() => navigate(`/employees/${emp.id}`)}>{emp.departmentName || '-'}</TableCell>
-                    <TableCell onClick={() => navigate(`/employees/${emp.id}`)}>{emp.position || '-'}</TableCell>
                     <TableCell onClick={() => navigate(`/employees/${emp.id}`)}>
-                      ZMW {emp.rate?.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) || '-'}
+                      <Typography variant="body2">{emp.email || '—'}</Typography>
+                      {emp.phone && (
+                        <Typography variant="caption" color="text.secondary">{emp.phone}</Typography>
+                      )}
+                    </TableCell>
+                    <TableCell onClick={() => navigate(`/employees/${emp.id}`)}>
+                      <Typography variant="body2">{emp.departmentName || '—'}</Typography>
+                    </TableCell>
+                    <TableCell onClick={() => navigate(`/employees/${emp.id}`)}>
+                      <Typography variant="body2">{emp.position || '—'}</Typography>
+                    </TableCell>
+                    <TableCell onClick={() => navigate(`/employees/${emp.id}`)}>
+                      <Typography variant="body2" fontWeight={600}>
+                        {emp.rate != null
+                          ? `ZMW ${Number(emp.rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : '—'}
+                      </Typography>
                     </TableCell>
                     <TableCell>
-                      <Chip label={emp.status} color={statusColors[emp.status] || 'default'} size="small" />
+                      <StatusChip status={emp.status} />
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton size="small" onClick={() => navigate(`/employees/${emp.id}`)}>
-                        <Visibility />
-                      </IconButton>
-                      <IconButton size="small" onClick={() => openEdit(emp)}>
-                        <Edit />
-                      </IconButton>
-                      <IconButton size="small" color="error" onClick={() => setDeleteId(emp.id)}>
-                        <Delete />
-                      </IconButton>
+                      <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                        <Tooltip title="View employee details">
+                          <IconButton size="small" onClick={() => navigate(`/employees/${emp.id}`)}>
+                            <Visibility fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Edit employee">
+                          <IconButton size="small" onClick={() => openEdit(emp)}>
+                            <Edit fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title={emp.status === 'ACTIVE' ? 'Deactivate employee' : 'Delete'}>
+                          <IconButton size="small" color="error" onClick={() => setDeleteId(emp.id)}>
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))
@@ -235,9 +402,11 @@ export default function Employees() {
         />
       </Card>
 
-      {/* Create/Edit Dialog */}
+      {/* ── Create/Edit Dialog ── */}
       <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="md" fullWidth>
-        <DialogTitle>{editId ? 'Edit Employee' : 'Add Employee'}</DialogTitle>
+        <DialogTitle sx={{ fontWeight: 700 }}>
+          {editId ? 'Edit Employee' : 'Add Employee'}
+        </DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid item xs={12} sm={4}>
@@ -329,7 +498,7 @@ export default function Employees() {
         <DialogActions>
           <Button onClick={closeDialog}>Cancel</Button>
           <Button onClick={handleSubmit} variant="contained" disabled={createMutation.isPending || updateMutation.isPending}>
-            {editId ? 'Update' : 'Create'} Employee
+            {editId ? 'Update Employee' : 'Create Employee'}
           </Button>
         </DialogActions>
       </Dialog>

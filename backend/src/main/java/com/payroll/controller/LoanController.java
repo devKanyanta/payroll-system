@@ -20,8 +20,12 @@ public class LoanController {
     private final LoanService loanService;
 
     @GetMapping
-    public ResponseEntity<List<LoanResponse>> getLoansByEmployee(@RequestParam UUID employeeId) {
-        return ResponseEntity.ok(loanService.getLoansByEmployee(employeeId));
+    public ResponseEntity<List<LoanResponse>> getLoans(
+            @RequestParam(required = false) UUID employeeId) {
+        if (employeeId != null) {
+            return ResponseEntity.ok(loanService.getLoansByEmployee(employeeId));
+        }
+        return ResponseEntity.ok(loanService.getAllLoans());
     }
 
     @GetMapping("/{id}")

@@ -5,8 +5,10 @@ import com.payroll.dto.EmployeeResponse;
 import com.payroll.dto.PagedResponse;
 import com.payroll.entity.EmployeeStatus;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public interface EmployeeService {
@@ -15,6 +17,6 @@ public interface EmployeeService {
     EmployeeResponse createEmployee(EmployeeRequest request);
     EmployeeResponse updateEmployee(UUID id, EmployeeRequest request);
     void deleteEmployee(UUID id);
-    String generateEmployeeNumber();
-    List<EmployeeResponse> getActiveEmployeesNotInPayrollRun(UUID payrollRunId);
+    List<EmployeeResponse> getActiveEmployeesNotInPayrollRun(UUID payrollRunId, UUID departmentId);
+    Map<String, Object> importEmployees(MultipartFile file);
 }

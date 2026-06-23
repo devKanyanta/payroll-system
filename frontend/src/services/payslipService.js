@@ -7,4 +7,5 @@ export const payslipService = {
   email: (id) => api.post(`/payslips/${id}/email`),
   download: (id) => api.get(`/payslips/${id}/download`, { responseType: 'blob' }),
   emailAll: (payrollRunId) => api.post(`/payroll-runs/${payrollRunId}/email-payslips`),
+  downloadZip: (payrollRunId) => api.get(`/payslips/download-zip/${payrollRunId}`, { responseType: 'blob' }),
 };

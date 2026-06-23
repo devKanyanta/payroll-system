@@ -17,4 +17,7 @@ public interface PayslipService {
 
     // New: Invalidate payslips for a run (when reopened from APPROVED)
     void invalidatePayslipsForRun(UUID payrollRunId);
+
+    // New: Download all payslips for a run as a ZIP
+    byte[] downloadPayslipsZip(UUID payrollRunId);
 }
