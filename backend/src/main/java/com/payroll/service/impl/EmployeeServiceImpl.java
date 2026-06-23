@@ -42,7 +42,8 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     @Transactional
     public EmployeeResponse createEmployee(EmployeeRequest request) {
-        if (employeeRepository.existsByEmail(request.getEmail())) {
+        if (request.getEmail() != null && !request.getEmail().isBlank()
+                && employeeRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException("Employee with email '" + request.getEmail() + "' already exists");
         }
 
@@ -65,6 +66,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .employmentType(EmploymentType.valueOf(request.getEmploymentType()))
                 .salaryType(SalaryType.valueOf(request.getSalaryType()))
                 .bankName(request.getBankName())
+                .sortCode(request.getSortCode())
                 .accountNumber(request.getAccountNumber())
                 .dateHired(request.getDateHired())
                 .rate(request.getRate())
@@ -80,7 +82,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", id));
 
-        if (!employee.getEmail().equalsIgnoreCase(request.getEmail())
+        if (request.getEmail() != null && !request.getEmail().isBlank()
+                && !employee.getEmail().equalsIgnoreCase(request.getEmail())
                 && employeeRepository.existsByEmail(request.getEmail())) {
             throw new DuplicateResourceException("Employee with email '" + request.getEmail() + "' already exists");
         }
@@ -109,6 +112,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         employee.setEmploymentType(EmploymentType.valueOf(request.getEmploymentType()));
         employee.setSalaryType(SalaryType.valueOf(request.getSalaryType()));
         employee.setBankName(request.getBankName());
+        employee.setSortCode(request.getSortCode());
         employee.setAccountNumber(request.getAccountNumber());
         employee.setDateHired(request.getDateHired());
         employee.setRate(request.getRate());
@@ -122,7 +126,8 @@ public class EmployeeServiceImpl implements EmployeeService {
     public void deleteEmployee(UUID id) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", id));
-        employeeRepository.delete(employee);
+        employee.setStatus(EmployeeStatus.INACTIVE);
+        employeeRepository.save(employee);
     }
 
     @Override
@@ -156,6 +161,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .employmentType(employee.getEmploymentType().name())
                 .salaryType(employee.getSalaryType().name())
                 .bankName(employee.getBankName())
+                .sortCode(employee.getSortCode())
                 .accountNumber(employee.getAccountNumber())
                 .dateHired(employee.getDateHired())
                 .rate(employee.getRate())

@@ -29,6 +29,7 @@ public class EmployeeResponse {
     private String employmentType;
     private String salaryType;
     private String bankName;
+    private String sortCode;
     private String accountNumber;
     private LocalDate dateHired;
     private BigDecimal rate;

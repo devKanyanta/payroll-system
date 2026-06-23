@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -38,6 +39,8 @@ public class PayrollRunServiceImpl implements PayrollRunService {
     private final AuditService auditService;
     private final EmployeeDeductionRepository employeeDeductionRepository;
     private final DeductionTypeRepository deductionTypeRepository;
+    private final PayslipRepository payslipRepository;
+    private final PayrollImportRepository payrollImportRepository;
 
     // ====================== Validation ======================
 
@@ -45,12 +48,6 @@ public class PayrollRunServiceImpl implements PayrollRunService {
     public List<Map<String, String>> validateBeforeSubmit(UUID runId) {
         PayrollRun payrollRun = payrollRunRepository.findById(runId)
                 .orElseThrow(() -> new ResourceNotFoundException("PayrollRun", runId));
-
-        PayrollSettings settings = payrollSettingsRepository
-                .findTopByEffectiveDateLessThanEqualOrderByEffectiveDateDesc(LocalDate.now())
-                .orElse(null);
-
-        int maxWorkingDays = settings != null ? settings.getWorkingDaysPerMonth() : 22;
 
         List<PayrollEntry> entries = payrollEntryRepository.findByPayrollRunId(runId);
         List<Map<String, String>> errors = new ArrayList<>();
@@ -86,17 +83,7 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                 ));
             }
 
-            // Rule 4: Present days ≤ working days per month
-            if (entry.getPresentDays() != null && entry.getPresentDays().compareTo(BigDecimal.valueOf(maxWorkingDays)) > 0) {
-                errors.add(Map.of(
-                        "employeeName", empName,
-                        "field", "presentDays",
-                        "message", empName + " has " + entry.getPresentDays().stripTrailingZeros().toPlainString()
-                                + " present days, exceeding the maximum of " + maxWorkingDays + "."
-                ));
-            }
-
-            // Rule 5: Overtime hours ≥ 0
+            // Rule 4: Overtime hours ≥ 0
             if (entry.getOvertimeHours() != null && entry.getOvertimeHours().compareTo(BigDecimal.ZERO) < 0) {
                 errors.add(Map.of(
                         "employeeName", empName,
@@ -105,7 +92,7 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                 ));
             }
 
-            // Rule 6: Holiday hours ≥ 0
+            // Rule 5: Holiday hours ≥ 0
             if (entry.getHolidayHours() != null && entry.getHolidayHours().compareTo(BigDecimal.ZERO) < 0) {
                 errors.add(Map.of(
                         "employeeName", empName,
@@ -114,7 +101,7 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                 ));
             }
 
-            // Rule 7: Net salary ≥ 0
+            // Rule 6: Net salary ≥ 0
             if (entry.getNetSalary() != null && entry.getNetSalary().compareTo(BigDecimal.ZERO) < 0) {
                 errors.add(Map.of(
                         "employeeName", empName,
@@ -952,6 +939,115 @@ public class PayrollRunServiceImpl implements PayrollRunService {
         font.setFontHeightInPoints((short) 14);
         style.setFont(font);
         return style;
+    }
+
+    // ====================== Delete ======================
+
+    @Override
+    @Transactional
+    public void deletePayrollRun(UUID id, UUID userId) {
+        PayrollRun payrollRun = payrollRunRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("PayrollRun", id));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+
+        if (user.getRole() != Role.ADMIN) {
+            throw new BusinessRuleException("Only ADMIN users can delete payroll runs.");
+        }
+
+        // Delete associated payroll imports first
+        List<PayrollImport> payrollImports = payrollImportRepository.findByPayrollRunIdOrderByCreatedAtDesc(id);
+        payrollImportRepository.deleteAll(payrollImports);
+
+        // Cascade delete in order: payslips → employee deductions → payroll entries → payroll run
+        List<PayrollEntry> entries = payrollEntryRepository.findByPayrollRunId(id);
+        for (PayrollEntry entry : entries) {
+            // Delete payslips for this entry
+            List<Payslip> payslips = payslipRepository.findByPayrollEntryId(entry.getId());
+            payslipRepository.deleteAll(payslips);
+
+            // Delete employee deductions for this entry
+            List<EmployeeDeduction> deductions = employeeDeductionRepository.findByPayrollEntryId(entry.getId());
+            employeeDeductionRepository.deleteAll(deductions);
+        }
+
+        // Delete all payroll entries
+        payrollEntryRepository.deleteAll(entries);
+
+        // Delete the payroll run itself
+        payrollRunRepository.delete(payrollRun);
+
+        auditService.logEvent(userId, "DELETE", "PayrollRun", payrollRun.getId().toString(),
+                payrollRun.getStatus().name(), null,
+                String.format("Payroll run for %d/%d deleted by admin", payrollRun.getMonth(), payrollRun.getYear()));
+    }
+
+    // ====================== Bank Payment Export ======================
+
+    @Override
+    public byte[] exportPayrollRunForBankPayment(UUID runId) {
+        PayrollRun payrollRun = payrollRunRepository.findById(runId)
+                .orElseThrow(() -> new ResourceNotFoundException("PayrollRun", runId));
+
+        if (payrollRun.getStatus() != PayrollRunStatus.APPROVED) {
+            throw new BusinessRuleException("Bank payment export is only available for APPROVED payroll runs.");
+        }
+
+        List<PayrollEntry> entries = payrollEntryRepository.findByPayrollRunId(runId);
+
+        String reference = getMonthName(payrollRun.getMonth()) + " pay " + payrollRun.getYear();
+
+        try (InputStream templateStream = new ClassPathResource("BANK_PAYMENT_TEMPLATE.xlsx").getInputStream();
+             Workbook workbook = new XSSFWorkbook(templateStream);
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+
+            // Clear existing data rows (rows 2+, 0-indexed)
+            for (int i = sheet.getLastRowNum(); i >= 1; i--) {
+                Row row = sheet.getRow(i);
+                if (row != null) {
+                    sheet.removeRow(row);
+                }
+            }
+
+            // Data rows starting from row 2 (0-indexed = 1)
+            int rowNum = 1;
+            for (PayrollEntry entry : entries) {
+                Employee employee = entry.getEmployee();
+                Row row = sheet.createRow(rowNum++);
+
+                // A: Payee - full name
+                Cell payeeCell = row.createCell(0);
+                String fullName = employee.getFirstName() + " " + employee.getLastName();
+                payeeCell.setCellValue(fullName.toUpperCase());
+
+                // B: Account Number
+                Cell accCell = row.createCell(1);
+                accCell.setCellValue(employee.getAccountNumber() != null ? employee.getAccountNumber() : "");
+
+                // C: Sort Code
+                Cell sortCell = row.createCell(2);
+                sortCell.setCellValue(employee.getSortCode() != null ? employee.getSortCode() : "");
+
+                // D: Amount (Net Salary, rounded up to whole number)
+                Cell amountCell = row.createCell(3);
+                BigDecimal netSalary = entry.getNetSalary() != null ? entry.getNetSalary() : BigDecimal.ZERO;
+                int roundedAmount = netSalary.setScale(0, RoundingMode.FLOOR).intValue();
+                amountCell.setCellValue(roundedAmount);
+
+                // E: Reference
+                Cell refCell = row.createCell(4);
+                refCell.setCellValue(reference);
+            }
+
+            workbook.write(bos);
+            return bos.toByteArray();
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to export bank payment file", e);
+        }
     }
 
     private String getMonthName(int month) {

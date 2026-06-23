@@ -18,6 +18,7 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
     Optional<Employee> findByEmployeeNumber(String employeeNumber);
     boolean existsByEmployeeNumber(String employeeNumber);
     boolean existsByEmail(String email);
+    boolean existsByNrc(String nrc);
 
     Page<Employee> findByStatus(EmployeeStatus status, Pageable pageable);
 

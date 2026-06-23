@@ -1,6 +1,5 @@
 import { Outlet } from 'react-router-dom';
 import { Box, Paper, Typography, useTheme } from '@mui/material';
-import { Receipt } from '@mui/icons-material';
 
 export default function AuthLayout() {
   const theme = useTheme();
@@ -20,9 +19,18 @@ export default function AuthLayout() {
         border: 1, borderColor: 'divider',
       }}>
         <Box sx={{ textAlign: 'center', mb: 3 }}>
-          <Receipt sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
-          <Typography variant="h5" fontWeight={700}>Payroll System</Typography>
-          <Typography color="text.secondary" variant="body2">Zambia Payroll Management</Typography>
+          <Box
+            component="img"
+            src="/MSL.png"
+            alt="MESL Logo"
+            sx={{ height: 64, mb: 1.5 }}
+          />
+          <Typography variant="h5" fontWeight={700} color="primary.main">
+            Musunga Engineering Payroll
+          </Typography>
+          <Typography color="text.secondary" variant="body2">
+            Musunga Engineering Services Limited
+          </Typography>
         </Box>
         <Outlet />
       </Paper>

@@ -35,4 +35,10 @@ public interface PayrollRunService {
 
     // New: Bulk email payslips
     Map<String, Object> emailAllPayslips(UUID runId);
+
+    // New: Delete payroll run (admin only)
+    void deletePayrollRun(UUID id, UUID userId);
+
+    // New: Export bank payment file (only for APPROVED runs)
+    byte[] exportPayrollRunForBankPayment(UUID runId);
 }

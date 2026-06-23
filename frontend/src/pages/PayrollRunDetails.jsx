@@ -11,7 +11,7 @@ import {
 import {
   ArrowBack, Send, CheckCircle, Cancel, Refresh, Add,
   Delete, Download, PersonAdd, Email, Warning, RemoveCircle, PictureAsPdf,
-  ExpandMore,
+  ExpandMore, AccountBalance,
 } from '@mui/icons-material';
 import { payrollRunService } from '../services/payrollRunService';
 import { payslipService } from '../services/payslipService';
@@ -382,6 +382,15 @@ export default function PayrollRunDetails() {
     }
   };
 
+  const handleExportBankPayment = async () => {
+    try {
+      await payrollRunService.exportBankPayment(id);
+      setSnackbar({ open: true, message: 'Bank payment file downloaded successfully', severity: 'success' });
+    } catch (err) {
+      setSnackbar({ open: true, message: 'Bank payment export failed: ' + (err.response?.data?.message || err.message), severity: 'error' });
+    }
+  };
+
   const handleEmailPayslips = () => {
     setConfirmEmailDialog(true);
   };
@@ -554,6 +563,10 @@ export default function PayrollRunDetails() {
                 <>
                   <Button variant="outlined" startIcon={<Download />} onClick={handleExport}>
                     Export Excel
+                  </Button>
+                  <Button variant="contained" color="success" startIcon={<AccountBalance />}
+                    onClick={handleExportBankPayment}>
+                    Download for Bank
                   </Button>
                   <Button variant="outlined" startIcon={<PictureAsPdf />}
                     onClick={() => generatePayslipsMutation.mutate()}

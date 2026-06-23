@@ -23,14 +23,20 @@ import {
 
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-  { text: 'Employees', icon: <PeopleIcon />, path: '/employees' },
+  {
+    text: 'Employees', icon: <PeopleIcon />,
+    children: [
+      { text: 'All Employees', icon: <PeopleIcon />, path: '/employees' },
+      { text: 'Import', icon: <ImportIcon />, path: '/employees/import' },
+    ],
+  },
   { text: 'Departments', icon: <BusinessIcon />, path: '/departments' },
   { text: 'Loans', icon: <LoanIcon />, path: '/loans' },
   {
     text: 'Payroll', icon: <AttachMoney />,
     children: [
       { text: 'Payroll Runs', icon: <PayrollIcon />, path: '/payroll-runs' },
-      { text: 'Import', icon: <ImportIcon />, path: '/payroll-import' },
+      { text: 'Payroll Import', icon: <ImportIcon />, path: '/payroll-import' },
       { text: 'Payslips', icon: <PayslipIcon />, path: '/payslips' },
     ],
   },
@@ -46,14 +52,14 @@ export default function Sidebar({ open, onToggle, role }) {
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  const [payrollOpen, setPayrollOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState({});
 
   const isActive = (path) => location.pathname === path ||
     (path && location.pathname.startsWith(path));
 
   const handleClick = (item) => {
     if (item.children) {
-      setPayrollOpen(!payrollOpen);
+      setMenuOpen((prev) => ({ ...prev, [item.text]: !prev[item.text] }));
     } else if (item.path) {
       navigate(item.path);
       if (isMobile) onToggle();
@@ -63,18 +69,30 @@ export default function Sidebar({ open, onToggle, role }) {
   const drawerWidth = 260;
   const collapsedWidth = 64;
 
-  const drawerContent = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+  const drawerContent = (      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', bgcolor: '#0D47A1', color: 'white' }}>
       <Box sx={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         px: open ? 2 : 1, py: 2, minHeight: 64,
       }}>
         {open && (
-          <Typography variant="h6" sx={{ fontWeight: 700, color: 'primary.main' }}>
-            Payroll
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box
+              component="img"
+              src="/MSL.png"
+              alt="MESL"
+              sx={{ height: 32 }}
+            />
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 700, lineHeight: 1.2, color: 'white' }}>
+                Musunga Engineering
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.7)', lineHeight: 1.2 }}>
+                Payroll
+              </Typography>
+            </Box>
+          </Box>
         )}
-        <IconButton onClick={onToggle} size="small">
+        <IconButton onClick={onToggle} size="small" sx={{ color: 'white' }}>
           {open ? <ChevronLeft /> : <ChevronRight />}
         </IconButton>
       </Box>
@@ -90,26 +108,43 @@ export default function Sidebar({ open, onToggle, role }) {
               <Box key={item.text}>
                 <ListItemButton
                   onClick={() => handleClick(item)}
-                  selected={isActive('/payroll')}
-                  sx={{ borderRadius: 2, mb: 0.5, justifyContent: open ? 'initial' : 'center', px: open ? 2 : 1 }}
+                  selected={menuItems.some(m =>
+                    m.text === item.text && m.children?.some(c => isActive(c.path))
+                  )}
+                  sx={{
+                    borderRadius: 2, mb: 0.5,
+                    justifyContent: open ? 'initial' : 'center',
+                    px: open ? 2 : 1,
+                    color: 'white',
+                    '&.Mui-selected': { bgcolor: 'rgba(255,255,255,0.15)' },
+                    '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                    '& .MuiListItemIcon-root': { color: 'white' },
+                  }}
                 >
-                  <ListItemIcon sx={{ minWidth: open ? 40 : 0, justifyContent: 'center' }}>
+                  <ListItemIcon sx={{ minWidth: open ? 40 : 0, justifyContent: 'center', color: 'white' }}>
                     {item.icon}
                   </ListItemIcon>
-                  {open && <ListItemText primary={item.text} />}
-                  {open && (payrollOpen ? <ExpandLess /> : <ExpandMore />)}
+                  {open && <ListItemText primary={item.text} sx={{ '& .MuiListItemText-primary': { color: 'white' } }} />}
+                  {open && (menuOpen[item.text] ? <ExpandLess sx={{ color: 'white' }} /> : <ExpandMore sx={{ color: 'white' }} />)}
                 </ListItemButton>
-                <Collapse in={payrollOpen && open}>
+                <Collapse in={menuOpen[item.text] && open}>
                   <List sx={{ pl: 2 }}>
                     {item.children.map((child) => (
                       <ListItemButton
                         key={child.text}
                         onClick={() => handleClick(child)}
                         selected={isActive(child.path)}
-                        sx={{ borderRadius: 2, mb: 0.5 }}
+                        sx={{
+                          borderRadius: 2, mb: 0.5,
+                          color: 'white',
+                          '&.Mui-selected': { bgcolor: '#FF6F00' },
+                          '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                          '& .MuiListItemIcon-root': { color: 'white' },
+                          '& .MuiListItemText-primary': { color: 'white' },
+                        }}
                       >
-                        <ListItemIcon sx={{ minWidth: 40 }}>{child.icon}</ListItemIcon>
-                        <ListItemText primary={child.text} />
+                        <ListItemIcon sx={{ minWidth: 40, color: 'white' }}>{child.icon}</ListItemIcon>
+                        <ListItemText primary={child.text} sx={{ '& .MuiListItemText-primary': { color: 'white' } }} />
                       </ListItemButton>
                     ))}
                   </List>
@@ -127,15 +162,20 @@ export default function Sidebar({ open, onToggle, role }) {
                 borderRadius: 2, mb: 0.5,
                 justifyContent: open ? 'initial' : 'center',
                 px: open ? 2 : 1,
+                color: 'white',
                 '&.Mui-selected': {
-                  backgroundColor: 'primary.main',
+                  bgcolor: '#FF6F00',
                   color: 'white',
-                  '&:hover': { backgroundColor: 'primary.dark' },
+                  '&:hover': { bgcolor: '#C43E00' },
                   '& .MuiListItemIcon-root': { color: 'white' },
+                  '& .MuiListItemText-primary': { color: 'white' },
                 },
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' },
+                '& .MuiListItemIcon-root': { color: 'white' },
+                '& .MuiListItemText-primary': { color: 'white' },
               }}
             >
-              <ListItemIcon sx={{ minWidth: open ? 40 : 0, justifyContent: 'center' }}>
+              <ListItemIcon sx={{ minWidth: open ? 40 : 0, justifyContent: 'center', color: 'white' }}>
                 {item.icon}
               </ListItemIcon>
               {open && <ListItemText primary={item.text} />}

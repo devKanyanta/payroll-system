@@ -19,10 +19,18 @@ export const payrollRunService = {
   removeDeduction: (runId, entryId, deductionId) =>
     api.delete(`/payroll-runs/${runId}/entries/${entryId}/deductions/${deductionId}`),
   emailPayslips: (id) => api.post(`/payroll-runs/${id}/email-payslips`),
+  delete: (id) => api.delete(`/payroll-runs/${id}`),
   exportExcel: async (id) => {
     const res = await api.get(`/payroll-runs/${id}/export/excel`, {
       responseType: 'blob',
     });
     downloadBlob(res.data, `payroll-run-${id}.xlsx`);
+  },
+
+  exportBankPayment: async (id) => {
+    const res = await api.get(`/payroll-runs/${id}/export/bank-payment`, {
+      responseType: 'blob',
+    });
+    downloadBlob(res.data, `salary-upload-${id}.xlsx`);
   },
 };

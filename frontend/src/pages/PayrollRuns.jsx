@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, Button, Select, MenuItem, FormControl,
   InputLabel, Table, TableBody, TableCell, TableContainer, TableHead,
-  TableRow, Chip, Card, CardContent, TablePagination, Grid,
+  TableRow, Chip, Card, CardContent, TablePagination, Grid, IconButton, Tooltip,
 } from '@mui/material';
-import { Add, Visibility } from '@mui/icons-material';
+import { Add, Visibility, Delete } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { payrollRunService } from '../services/payrollRunService';
+import { useAuth } from '../contexts/AuthContext';
 import LoadingScreen from '../components/LoadingScreen';
+import ConfirmDialog from '../components/ConfirmDialog';
 import dayjs from 'dayjs';
 
 const statusColors = {
@@ -30,6 +32,9 @@ export default function PayrollRuns() {
   const [monthFilter, setMonthFilter] = useState('');
   const [yearFilter, setYearFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [deleteId, setDeleteId] = useState(null);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const { data: pageData, isLoading } = useQuery({
@@ -43,6 +48,16 @@ export default function PayrollRuns() {
       return res.data;
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => payrollRunService.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payroll-runs'] });
+      setDeleteId(null);
+    },
+  });
+
+  const isAdmin = user?.role === 'ADMIN';
 
   const getMonthName = (m) => months.find((mo) => mo.value === m)?.label || m;
 
@@ -145,6 +160,17 @@ export default function PayrollRuns() {
                         onClick={() => navigate(`/payroll-runs/${run.id}`)}>
                         View
                       </Button>
+                      {isAdmin && (
+                        <Tooltip title="Delete payroll run">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={(e) => { e.stopPropagation(); setDeleteId(run.id); }}
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))
@@ -158,6 +184,16 @@ export default function PayrollRuns() {
           onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
         />
       </Card>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        title="Delete Payroll Run"
+        message="Are you sure you want to delete this payroll run? This will permanently remove all entries, deductions, and payslips associated with it. This action cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={() => deleteMutation.mutate(deleteId)}
+        onCancel={() => setDeleteId(null)}
+        color="error"
+      />
     </Box>
   );
 }

@@ -16,10 +16,12 @@ import com.payroll.service.PayslipService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.time.LocalDateTime;
@@ -123,13 +125,64 @@ public class PayslipServiceImpl implements PayslipService {
         PdfWriter.getInstance(document, baos);
         document.open();
 
-        // --- Title ---
+        // --- Company Header ---
         Font titleFont = new Font(Font.HELVETICA, 18, Font.BOLD);
         Font headerFont = new Font(Font.HELVETICA, 12, Font.BOLD);
         Font normalFont = new Font(Font.HELVETICA, 10, Font.NORMAL);
         Font boldFont = new Font(Font.HELVETICA, 10, Font.BOLD);
         Font highlightFont = new Font(Font.HELVETICA, 14, Font.BOLD);
+        java.awt.Color navyColor = new java.awt.Color(13, 71, 161);
 
+        // Try to load and embed the MSL logo
+        try {
+            InputStream logoStream = new ClassPathResource("MSL.png").getInputStream();
+            byte[] logoBytes = logoStream.readAllBytes();
+            Image logo = Image.getInstance(logoBytes);
+            logo.scaleToFit(120, 50);
+            logo.setAlignment(Element.ALIGN_LEFT);
+
+            // Company name beside the logo
+            PdfPTable headerTable = new PdfPTable(2);
+            headerTable.setWidthPercentage(100);
+            headerTable.setWidths(new float[]{1, 4});
+            headerTable.getDefaultCell().setBorder(Rectangle.NO_BORDER);
+            headerTable.getDefaultCell().setPadding(2f);
+
+            PdfPCell logoCell = new PdfPCell(logo);
+            logoCell.setBorder(Rectangle.NO_BORDER);
+            logoCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            headerTable.addCell(logoCell);
+
+            PdfPCell nameCell = new PdfPCell();
+            nameCell.setBorder(Rectangle.NO_BORDER);
+            nameCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+            Paragraph companyName = new Paragraph("Musunga Engineering Services Ltd",
+                    new Font(Font.HELVETICA, 14, Font.BOLD, navyColor));
+            companyName.setSpacingAfter(2f);
+            nameCell.addElement(companyName);
+            Paragraph companyTagline = new Paragraph("Payroll Department",
+                    new Font(Font.HELVETICA, 10, Font.NORMAL, new java.awt.Color(100, 100, 100)));
+            nameCell.addElement(companyTagline);
+            headerTable.addCell(nameCell);
+
+            document.add(headerTable);
+        } catch (Exception e) {
+            // Fallback: just show company name if logo can't be loaded
+            Paragraph companyFallback = new Paragraph("Musunga Engineering Services Ltd",
+                    new Font(Font.HELVETICA, 14, Font.BOLD, navyColor));
+            companyFallback.setAlignment(Element.ALIGN_CENTER);
+            document.add(companyFallback);
+        }
+
+        // --- Separator line in navy ---
+        Paragraph navSeparator = new Paragraph();
+        navSeparator.setSpacingBefore(10f);
+        navSeparator.setSpacingAfter(10f);
+        Chunk line = new Chunk(new com.lowagie.text.pdf.draw.LineSeparator(1f, 100, navyColor, Element.ALIGN_CENTER, -2f));
+        navSeparator.add(line);
+        document.add(navSeparator);
+
+        // --- Title ---
         Paragraph title = new Paragraph("PAYSLIP", titleFont);
         title.setAlignment(Element.ALIGN_CENTER);
         document.add(title);
@@ -239,6 +292,12 @@ public class PayslipServiceImpl implements PayslipService {
 
         // --- Footer ---
         Font footerFont = new Font(Font.HELVETICA, 8, Font.ITALIC);
+        Paragraph footerCompany = new Paragraph(
+                "Musunga Engineering Services Ltd",
+                new Font(Font.HELVETICA, 9, Font.BOLD, navyColor));
+        footerCompany.setAlignment(Element.ALIGN_CENTER);
+        footerCompany.setSpacingAfter(2f);
+        document.add(footerCompany);
         Paragraph footer = new Paragraph(
                 "Generated on " + LocalDateTime.now().toLocalDate() + " | This is a computer-generated document.",
                 footerFont);
@@ -256,9 +315,11 @@ public class PayslipServiceImpl implements PayslipService {
     }
 
     private void addTableHeader(PdfPTable table, String[] headers, Font font) {
+        java.awt.Color navyColor = new java.awt.Color(13, 71, 161);
+        Font whiteFont = new Font(Font.HELVETICA, 12, Font.BOLD, java.awt.Color.WHITE);
         for (String header : headers) {
-            PdfPCell cell = new PdfPCell(new Phrase(header, font));
-            cell.setBackgroundColor(new java.awt.Color(230, 230, 230));
+            PdfPCell cell = new PdfPCell(new Phrase(header, whiteFont));
+            cell.setBackgroundColor(navyColor);
             cell.setPadding(5f);
             cell.setHorizontalAlignment(header.equals("Earnings") || header.equals("Deductions")
                     ? Element.ALIGN_LEFT : Element.ALIGN_RIGHT);
@@ -367,7 +428,7 @@ public class PayslipServiceImpl implements PayslipService {
                         + " " + entry.getPayrollRun().getYear();
                 String subject = "Payslip for " + monthYear;
                 String text = "Dear " + employeeName + ",\n\nPlease find your payslip for "
-                        + monthYear + " attached.\n\nRegards,\nPayroll Team";
+                        + monthYear + " attached.\n\nRegards,\nMusunga Engineering Payroll";
 
                 emailService.sendPayslipEmail(employeeEmail, subject, text, pdf, "payslip.pdf");
 

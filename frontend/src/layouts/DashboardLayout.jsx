@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import SessionExpiryModal from '../components/SessionExpiryModal';
 import { Outlet } from 'react-router-dom';
 import {
   Box, AppBar, Toolbar, Typography, IconButton, Badge,
@@ -53,7 +54,9 @@ export default function DashboardLayout() {
             >
               <MenuIcon />
             </IconButton>
-            <Typography variant="h6" sx={{ flex: 1, fontWeight: 600 }} />
+            <Typography variant="h6" sx={{ flex: 1, fontWeight: 600, color: 'primary.main' }}>
+              Musunga Engineering Payroll
+            </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <Tooltip title={`Switch to ${mode === 'light' ? 'dark' : 'light'} mode`}>
                 <IconButton onClick={toggleTheme} size="small">
@@ -103,6 +106,7 @@ export default function DashboardLayout() {
           <Outlet />
         </Box>
       </Box>
+      <SessionExpiryModal />
     </Box>
   );
 }

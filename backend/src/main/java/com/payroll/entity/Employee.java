@@ -29,7 +29,7 @@ public class Employee {
     @Column(name = "last_name", nullable = false, length = 100)
     private String lastName;
 
-    @Column(nullable = false, unique = true, length = 255)
+    @Column(length = 255)
     private String email;
 
     @Column(length = 20)
@@ -60,6 +60,9 @@ public class Employee {
 
     @Column(name = "bank_name", length = 200)
     private String bankName;
+
+    @Column(name = "sort_code", length = 50)
+    private String sortCode;
 
     @Column(name = "account_number", length = 50)
     private String accountNumber;

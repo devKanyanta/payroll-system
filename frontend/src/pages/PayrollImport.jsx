@@ -6,7 +6,7 @@ import {
   TableContainer, TableHead, TableRow, Select, MenuItem,
   FormControl, InputLabel, LinearProgress,
 } from '@mui/material';
-import { CloudUpload, CheckCircle, PlayArrow } from '@mui/icons-material';
+import { CloudUpload, CheckCircle, PlayArrow, Download } from '@mui/icons-material';
 import { payrollRunService } from '../services/payrollRunService';
 import apiService from '../services/api';
 import dayjs from 'dayjs';
@@ -31,6 +31,24 @@ export default function PayrollImport() {
       return res.data.content;
     },
   });
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await apiService.get('/payroll-import/template', {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'payroll-import-template.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Failed to download template');
+    }
+  };
 
   const handleUpload = async () => {
     if (!file || !selectedRunId) return;
@@ -81,7 +99,8 @@ export default function PayrollImport() {
     <Box>
       <Typography variant="h4" sx={{ mb: 0.5 }}>Payroll Import</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        Import employee payroll data from an Excel file using the PAYROLL TEMPLATE format
+        Import employee payroll data from an Excel file using the PAYROLL TEMPLATE format.
+        Download the template below to get started.
       </Typography>
 
       <Card sx={{ mb: 3 }}>
@@ -96,6 +115,29 @@ export default function PayrollImport() {
 
           {activeStep === 0 && (
             <Box>
+              <Box sx={{ textAlign: 'center', py: 2, mb: 3, borderBottom: 1, borderColor: 'divider' }}>
+                <Download sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
+                <Typography variant="h6" sx={{ mb: 1 }}>
+                  Step 1: Download the Template
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2, maxWidth: 600, mx: 'auto' }}>
+                  Download the PAYROLL TEMPLATE (.xlsx), fill in your employee payroll data,
+                  then upload it in the next steps.
+                </Typography>
+                <Button
+                  variant="contained"
+                  startIcon={<Download />}
+                  onClick={handleDownloadTemplate}
+                  sx={{ mb: 2 }}
+                >
+                  Download Template
+                </Button>
+                <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
+                  The template includes columns for employee info (names, NRC, employee number, job title, site,
+                  phone, email, bank details) and payroll calculation fields (rate, present days, overtime, etc.).
+                </Typography>
+              </Box>
+
               <FormControl fullWidth sx={{ mb: 3 }}>
                 <InputLabel>Payroll Run (Draft)</InputLabel>
                 <Select
@@ -109,6 +151,9 @@ export default function PayrollImport() {
                   ))}
                 </Select>
               </FormControl>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Step 2: Select the payroll run and proceed to upload your completed file.
+              </Typography>
               <Button variant="contained" disabled={!selectedRunId}
                 onClick={() => setActiveStep(1)}>
                 Next: Upload File

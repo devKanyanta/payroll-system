@@ -143,11 +143,29 @@ public class PayrollRunController {
         return ResponseEntity.ok(payrollRunService.emailAllPayslips(id));
     }
 
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletePayrollRun(
+            @PathVariable UUID id,
+            @RequestAttribute("userId") UUID userId) {
+        payrollRunService.deletePayrollRun(id, userId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}/export/excel")
     public ResponseEntity<byte[]> exportPayrollRunToExcel(@PathVariable UUID id) {
         byte[] data = payrollRunService.exportPayrollRunToExcel(id);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=payroll-run-" + id + ".xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(data);
+    }
+
+    @GetMapping("/{id}/export/bank-payment")
+    public ResponseEntity<byte[]> exportPayrollRunForBankPayment(@PathVariable UUID id) {
+        byte[] data = payrollRunService.exportPayrollRunForBankPayment(id);
+        String filename = "salary-upload-" + id + ".xlsx";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(data);
     }

@@ -9,6 +9,7 @@ import ChangePassword from '../pages/ChangePassword';
 import Dashboard from '../pages/Dashboard';
 import Employees from '../pages/Employees';
 import EmployeeDetails from '../pages/EmployeeDetails';
+import EmployeeImport from '../pages/EmployeeImport';
 import Departments from '../pages/Departments';
 import Loans from '../pages/Loans';
 import PayrollRuns from '../pages/PayrollRuns';
@@ -42,6 +43,7 @@ export default function AppRoutes() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/employees" element={<Employees />} />
         <Route path="/employees/:id" element={<EmployeeDetails />} />
+        <Route path="/employees/import" element={<EmployeeImport />} />
         <Route path="/departments" element={<Departments />} />
         <Route path="/loans" element={<Loans />} />
         <Route path="/payroll-runs" element={<PayrollRuns />} />

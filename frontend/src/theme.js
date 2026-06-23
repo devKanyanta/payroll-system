@@ -4,15 +4,15 @@ const getTheme = (mode) => createTheme({
   palette: {
     mode,
     primary: {
-      main: '#1a56db',
-      light: '#3b82f6',
-      dark: '#1e40af',
+      main: '#0D47A1',
+      light: '#1565C0',
+      dark: '#002171',
       contrastText: '#ffffff',
     },
     secondary: {
-      main: '#7c3aed',
-      light: '#a78bfa',
-      dark: '#5b21b6',
+      main: '#FF6F00',
+      light: '#FFA040',
+      dark: '#C43E00',
     },
     success: {
       main: '#059669',

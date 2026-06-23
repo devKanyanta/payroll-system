@@ -3,7 +3,10 @@ package com.payroll.controller;
 import com.payroll.entity.PayrollImport;
 import com.payroll.service.PayrollImportService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,6 +40,15 @@ public class PayrollImportController {
             @PathVariable UUID id,
             @RequestAttribute("userId") UUID userId) {
         return ResponseEntity.ok(payrollImportService.processImport(id, userId));
+    }
+
+    @GetMapping("/template")
+    public ResponseEntity<Resource> downloadTemplate() {
+        Resource resource = payrollImportService.downloadTemplate();
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"payroll-import-template.xlsx\"")
+                .body(resource);
     }
 
     @GetMapping("/{id}")

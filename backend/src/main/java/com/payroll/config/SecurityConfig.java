@@ -2,6 +2,7 @@ package com.payroll.config;
 
 import com.payroll.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -41,17 +42,19 @@ public class SecurityConfig {
                     "/swagger-ui.html",
                     "/actuator/health"
                 ).permitAll()
-                .requestMatchers("/api/users/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/settings/**").hasAnyRole("ADMIN", "HR", "MANAGER")
-                .requestMatchers("/api/settings/**").hasRole("ADMIN")
-                .requestMatchers("/api/audit-logs/**").hasRole("ADMIN")
-                .requestMatchers("/api/employees/**").hasAnyRole("ADMIN", "HR")
-                .requestMatchers("/api/loans/**").hasAnyRole("ADMIN", "HR")
-                .requestMatchers("/api/payroll-runs/**").hasAnyRole("ADMIN", "HR", "MANAGER")
-                .requestMatchers("/api/payroll-import/**").hasAnyRole("ADMIN", "HR")
-                .requestMatchers("/api/payslips/**").hasAnyRole("ADMIN", "HR", "MANAGER")
-                .requestMatchers("/api/expenses/**").hasAnyRole("ADMIN", "HR")
-                .requestMatchers("/api/reports/**").hasAnyRole("ADMIN", "HR", "MANAGER")
+                .requestMatchers("/api/users/**").hasAuthority("ROLE_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/settings/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR", "ROLE_MANAGER")
+                .requestMatchers("/api/settings/**").hasAuthority("ROLE_ADMIN")
+                .requestMatchers("/api/audit-logs/**").hasAuthority("ROLE_ADMIN")
+                .requestMatchers("/api/employees/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR")
+                .requestMatchers("/api/loans/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR")
+                .requestMatchers("/api/payroll-runs/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR", "ROLE_MANAGER")
+                .requestMatchers(HttpMethod.POST, "/api/payroll-import/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR")
+                .requestMatchers(HttpMethod.GET, "/api/payroll-import/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR")
+                .requestMatchers("/api/payroll-import/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR")
+                .requestMatchers("/api/payslips/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR", "ROLE_MANAGER")
+                .requestMatchers("/api/expenses/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR")
+                .requestMatchers("/api/reports/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR", "ROLE_MANAGER")
                 .requestMatchers("/api/notifications/**").authenticated()
                 .requestMatchers("/api/dashboard/**").authenticated()
                 .anyRequest().authenticated()

@@ -8,15 +8,19 @@ import com.payroll.security.CustomUserDetails;
 import com.payroll.security.JwtUtils;
 import com.payroll.service.AuditService;
 import com.payroll.service.AuthService;
+import com.payroll.service.EmailService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.*;
 import org.springframework.security.core.Authentication;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -29,9 +33,17 @@ public class AuthServiceImpl implements AuthService {
     private final AuditService auditService;
     private final JwtUtils jwtUtils;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
+
+    @Value("${app.base-url}")
+    private String baseUrl;
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCKOUT_DURATION_MINUTES = 30;
+
+    // Rate limiting: max 1 forgot-password request per email every 5 minutes
+    private static final long RESET_COOLDOWN_MINUTES = 5;
+    private final Map<String, LocalDateTime> lastResetRequest = new ConcurrentHashMap<>();
 
     @Override
     @Transactional
@@ -132,6 +144,14 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResourceNotFoundException("User", "email", request.getEmail()));
 
+        // Rate limit: check if a reset was requested within the last 5 minutes
+        String email = user.getEmail();
+        LocalDateTime lastRequested = lastResetRequest.get(email);
+        if (lastRequested != null && lastRequested.isAfter(LocalDateTime.now().minusMinutes(RESET_COOLDOWN_MINUTES))) {
+            // Silently return to avoid revealing rate limit info to potential attackers
+            return;
+        }
+
         String token = UUID.randomUUID().toString();
         PasswordResetToken resetToken = PasswordResetToken.builder()
                 .user(user)
@@ -139,6 +159,11 @@ public class AuthServiceImpl implements AuthService {
                 .expiresAt(LocalDateTime.now().plusHours(1))
                 .build();
         passwordResetTokenRepository.save(resetToken);
+
+        String resetLink = baseUrl + "/reset-password?token=" + token;
+        emailService.sendPasswordResetEmail(email, resetLink);
+
+        lastResetRequest.put(email, LocalDateTime.now());
     }
 
     @Override

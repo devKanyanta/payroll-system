@@ -337,7 +337,7 @@ export default function Employees() {
       <ConfirmDialog
         open={!!deleteId}
         title="Delete Employee"
-        message="Are you sure you want to delete this employee? This action cannot be undone."
+        message="Are you sure you want to deactivate this employee? They will be marked as inactive and excluded from payroll runs and active employee filters."
         onConfirm={() => deleteMutation.mutate(deleteId)}
         onCancel={() => setDeleteId(null)}
         color="error"
