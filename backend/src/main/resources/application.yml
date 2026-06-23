@@ -60,7 +60,7 @@ app:
   resend:
     api-key: ${RESEND_API_KEY:re_MA6LxTYU_FgRTU1U39N6dBtxpBL7mYznS}
     from-address: ${RESEND_FROM_ADDRESS:no-reply@mesltd.co.zm}
-  base-url: ${APP_BASE_URL:http://localhost:3000}
+  base-url: ${APP_BASE_URL:https://api.mesltd.co.zm}
   payslip-storage: ${PAYSLIP_STORAGE:./payslips}
 
 springdoc:
