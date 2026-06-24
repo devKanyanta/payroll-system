@@ -20,4 +20,7 @@ public interface PayslipService {
 
     // New: Download all payslips for a run as a ZIP
     byte[] downloadPayslipsZip(UUID payrollRunId);
+
+    // New: Download all payslips for a specific month/year as a ZIP
+    byte[] downloadPayslipsByMonth(int month, int year);
 }

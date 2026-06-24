@@ -12,6 +12,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.web.bind.annotation.RequestParam;
+
 @RestController
 @RequestMapping("/api/payslips")
 @RequiredArgsConstructor
@@ -55,6 +57,19 @@ public class PayslipController {
         byte[] zip = payslipService.downloadPayslipsZip(payrollRunId);
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=payslips-" + payrollRunId + ".zip")
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .body(zip);
+    }
+
+    @GetMapping("/download-by-month")
+    public ResponseEntity<byte[]> downloadPayslipsByMonth(
+            @RequestParam int month, @RequestParam int year) {
+        byte[] zip = payslipService.downloadPayslipsByMonth(month, year);
+        String[] monthNames = {"January","February","March","April","May","June",
+                "July","August","September","October","November","December"};
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=payslips-" + monthNames[month - 1] + "-" + year + ".zip")
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(zip);
     }

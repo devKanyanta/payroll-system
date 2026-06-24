@@ -89,8 +89,8 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .accountNumber(request.getAccountNumber())
                 .sortCode(request.getSortCode())
                 .status(EmployeeStatus.ACTIVE)
-                .salaryType(request.getSalaryType() != null ? request.getSalaryType() : SalaryType.MONTHLY)
-                .employmentType(request.getEmploymentType() != null ? request.getEmploymentType() : EmploymentType.PERMANENT)
+                .salaryType(request.getSalaryType() != null ? SalaryType.valueOf(request.getSalaryType()) : SalaryType.MONTHLY)
+                .employmentType(request.getEmploymentType() != null ? EmploymentType.valueOf(request.getEmploymentType()) : EmploymentType.FULL_TIME)
                 .department(department)
                 .build();
 
@@ -122,8 +122,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         employee.setBankName(request.getBankName());
         employee.setAccountNumber(request.getAccountNumber());
         employee.setSortCode(request.getSortCode());
-        employee.setSalaryType(request.getSalaryType());
-        employee.setEmploymentType(request.getEmploymentType());
+        employee.setSalaryType(request.getSalaryType() != null ? SalaryType.valueOf(request.getSalaryType()) : null);
+        employee.setEmploymentType(request.getEmploymentType() != null ? EmploymentType.valueOf(request.getEmploymentType()) : null);
         employee.setDepartment(department);
 
         Employee saved = employeeRepository.save(employee);
@@ -196,7 +196,7 @@ public class EmployeeServiceImpl implements EmployeeService {
 
                     String deptName = getCellStringValue(row, columnMap.get("department"));
                     if (deptName != null && !deptName.isEmpty()) {
-                        Department dept = departmentRepository.findByNameIgnoreCase(deptName.trim());
+                        Department dept = departmentRepository.findByName(deptName.trim()).orElse(null);
                         if (dept == null) {
                             dept = departmentRepository.save(Department.builder().name(deptName.trim()).build());
                         }

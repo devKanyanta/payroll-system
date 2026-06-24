@@ -24,8 +24,8 @@ public class AuditServiceImpl implements AuditService {
     @Override
     @Transactional
     public void logEvent(UUID userId, String action, String entityName,
-                         String entityId, String previousState,
-                         String newState, String notes) {
+                         String entityId, String oldValue,
+                         String newValue, String ipAddress) {
         User user = userId != null ? userRepository.findById(userId).orElse(null) : null;
 
         AuditLog log = AuditLog.builder()
@@ -33,9 +33,9 @@ public class AuditServiceImpl implements AuditService {
                 .action(action)
                 .entityName(entityName)
                 .entityId(entityId)
-                .previousState(previousState)
-                .newState(newState)
-                .notes(notes)
+                .oldValue(oldValue)
+                .newValue(newValue)
+                .ipAddress(ipAddress)
                 .timestamp(LocalDateTime.now())
                 .build();
 

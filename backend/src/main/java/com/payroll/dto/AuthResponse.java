@@ -13,6 +13,7 @@ public class AuthResponse {
     private UUID id;
     private String accessToken;
     private String refreshToken;
+    @Builder.Default
     private String tokenType = "Bearer";
     private String email;
     private String role;

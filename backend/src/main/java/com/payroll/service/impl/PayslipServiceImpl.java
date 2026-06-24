@@ -123,119 +123,189 @@ public class PayslipServiceImpl implements PayslipService {
         NumberFormat fmt = NumberFormat.getCurrencyInstance(new Locale("en", "ZM"));
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        Document document = new Document(PageSize.A4);
+        // Landscape orientation
+        Document document = new Document(PageSize.A4.rotate(), 36, 36, 36, 36);
         PdfWriter.getInstance(document, baos);
         document.open();
 
-        // --- Company Header ---
-        Font titleFont = new Font(Font.HELVETICA, 18, Font.BOLD);
-        Font headerFont = new Font(Font.HELVETICA, 12, Font.BOLD);
-        Font normalFont = new Font(Font.HELVETICA, 10, Font.NORMAL);
-        Font boldFont = new Font(Font.HELVETICA, 10, Font.BOLD);
-        Font highlightFont = new Font(Font.HELVETICA, 14, Font.BOLD);
         java.awt.Color navyColor = new java.awt.Color(13, 71, 161);
+        java.awt.Color accentColor = new java.awt.Color(0, 150, 80);
+        java.awt.Color lightGrayBg = new java.awt.Color(248, 249, 250);
+        java.awt.Color headerBg = new java.awt.Color(13, 71, 161);
+        java.awt.Color totalBg = new java.awt.Color(240, 244, 255);
 
-        // Try to load and embed the MSL logo
+        Font normalFont = new Font(Font.HELVETICA, 9, Font.NORMAL);
+        Font boldFont = new Font(Font.HELVETICA, 9, Font.BOLD);
+        Font whiteFont = new Font(Font.HELVETICA, 10, Font.BOLD, java.awt.Color.WHITE);
+        Font labelFont = new Font(Font.HELVETICA, 9, Font.BOLD, new java.awt.Color(100, 100, 100));
+
+        // ═══════════════════════════════════════════
+        //  HEADER — Logo + Company + Title
+        // ═══════════════════════════════════════════
+        PdfPTable headerRow = new PdfPTable(3);
+        headerRow.setWidthPercentage(100);
+        headerRow.setWidths(new float[]{1.5f, 4f, 3f});
+        headerRow.getDefaultCell().setBorder(Rectangle.NO_BORDER);
+        headerRow.getDefaultCell().setPadding(2f);
+
+        // Left: Logo
+        PdfPCell logoCell = new PdfPCell();
+        logoCell.setBorder(Rectangle.NO_BORDER);
+        logoCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
         try {
             InputStream logoStream = new ClassPathResource("MSL.png").getInputStream();
             byte[] logoBytes = logoStream.readAllBytes();
             Image logo = Image.getInstance(logoBytes);
-            logo.scaleToFit(120, 50);
-            logo.setAlignment(Element.ALIGN_LEFT);
-
-            // Company name beside the logo
-            PdfPTable headerTable = new PdfPTable(2);
-            headerTable.setWidthPercentage(100);
-            headerTable.setWidths(new float[]{1, 4});
-            headerTable.getDefaultCell().setBorder(Rectangle.NO_BORDER);
-            headerTable.getDefaultCell().setPadding(2f);
-
-            PdfPCell logoCell = new PdfPCell(logo);
-            logoCell.setBorder(Rectangle.NO_BORDER);
-            logoCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-            headerTable.addCell(logoCell);
-
-            PdfPCell nameCell = new PdfPCell();
-            nameCell.setBorder(Rectangle.NO_BORDER);
-            nameCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-            Paragraph companyName = new Paragraph("Musunga Engineering Services Ltd",
-                    new Font(Font.HELVETICA, 14, Font.BOLD, navyColor));
-            companyName.setSpacingAfter(2f);
-            nameCell.addElement(companyName);
-            Paragraph companyTagline = new Paragraph("Payroll Department",
-                    new Font(Font.HELVETICA, 10, Font.NORMAL, new java.awt.Color(100, 100, 100)));
-            nameCell.addElement(companyTagline);
-            headerTable.addCell(nameCell);
-
-            document.add(headerTable);
+            logo.scaleToFit(100, 45);
+            logoCell.addElement(logo);
         } catch (Exception e) {
-            // Fallback: just show company name if logo can't be loaded
-            Paragraph companyFallback = new Paragraph("Musunga Engineering Services Ltd",
-                    new Font(Font.HELVETICA, 14, Font.BOLD, navyColor));
-            companyFallback.setAlignment(Element.ALIGN_CENTER);
-            document.add(companyFallback);
+            // Fallback: just show company name
+            logoCell.addElement(new Paragraph("MSL", new Font(Font.HELVETICA, 16, Font.BOLD, navyColor)));
         }
+        headerRow.addCell(logoCell);
 
-        // --- Separator line in navy ---
-        Paragraph navSeparator = new Paragraph();
-        navSeparator.setSpacingBefore(10f);
-        navSeparator.setSpacingAfter(10f);
-        Chunk line = new Chunk(new com.lowagie.text.pdf.draw.LineSeparator(1f, 100, navyColor, Element.ALIGN_CENTER, -2f));
-        navSeparator.add(line);
-        document.add(navSeparator);
+        // Center: Company name
+        PdfPCell companyCell = new PdfPCell();
+        companyCell.setBorder(Rectangle.NO_BORDER);
+        companyCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        Paragraph companyName = new Paragraph("Musunga Engineering Services Ltd",
+                new Font(Font.HELVETICA, 12, Font.BOLD, navyColor));
+        companyName.setSpacingAfter(1f);
+        companyCell.addElement(companyName);
+        Paragraph tagline = new Paragraph("Payroll Department",
+                new Font(Font.HELVETICA, 9, Font.NORMAL, new java.awt.Color(120, 120, 120)));
+        companyCell.addElement(tagline);
+        headerRow.addCell(companyCell);
 
-        // --- Title ---
-        Paragraph title = new Paragraph("PAYSLIP", titleFont);
-        title.setAlignment(Element.ALIGN_CENTER);
-        document.add(title);
+        // Right: Payslip title + period (boxed)
+        PdfPCell titleCell = new PdfPCell();
+        titleCell.setBorder(Rectangle.NO_BORDER);
+        titleCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        titleCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
-        Paragraph period = new Paragraph(
+        PdfPTable titleBox = new PdfPTable(1);
+        titleBox.setWidthPercentage(100);
+        PdfPCell titleBoxCell = new PdfPCell();
+        titleBoxCell.setBackgroundColor(new java.awt.Color(13, 71, 161));
+        titleBoxCell.setPadding(8f);
+        titleBoxCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        titleBoxCell.setBorder(Rectangle.BOX);
+        titleBoxCell.setBorderColor(navyColor);
+        Paragraph titleText = new Paragraph("PAYSLIP", new Font(Font.HELVETICA, 16, Font.BOLD, java.awt.Color.WHITE));
+        titleText.setSpacingAfter(2f);
+        titleBoxCell.addElement(titleText);
+        Paragraph periodText = new Paragraph(
                 MONTH_NAMES[payrollRun.getMonth() - 1] + " " + payrollRun.getYear(),
-                headerFont);
-        period.setAlignment(Element.ALIGN_CENTER);
-        period.setSpacingAfter(20f);
-        document.add(period);
+                new Font(Font.HELVETICA, 10, Font.NORMAL, java.awt.Color.WHITE));
+        titleBoxCell.addElement(periodText);
+        titleBox.addCell(titleBoxCell);
+        titleCell.addElement(titleBox);
+        headerRow.addCell(titleCell);
 
-        // --- Employee Details ---
-        PdfPTable infoTable = new PdfPTable(2);
-        infoTable.setWidthPercentage(100);
-        infoTable.setSpacingAfter(15f);
-        infoTable.getDefaultCell().setBorder(Rectangle.NO_BORDER);
-        infoTable.getDefaultCell().setPadding(2f);
+        document.add(headerRow);
 
-        addInfoCell(infoTable, "Employee:", employee.getFirstName() + " " + employee.getLastName(), boldFont, normalFont);
-        addInfoCell(infoTable, "Employee #:", employee.getEmployeeNumber(), boldFont, normalFont);
-        addInfoCell(infoTable, "Department:",
-                employee.getDepartment() != null ? employee.getDepartment().getName() : "-", boldFont, normalFont);
-        addInfoCell(infoTable, "Position:",
-                employee.getPosition() != null ? employee.getPosition() : "-", boldFont, normalFont);
-        addInfoCell(infoTable, "NRC:", employee.getNrc(), boldFont, normalFont);
-        addInfoCell(infoTable, "Site:",
-                entry.getSite() != null ? entry.getSite() : "-", boldFont, normalFont);
-        addInfoCell(infoTable, "Bank:",
-                employee.getBankName() != null ? employee.getBankName() + " / " +
-                        (employee.getAccountNumber() != null ? employee.getAccountNumber() : "-") : "-",
-                boldFont, normalFont);
+        // Thin navy line separator
+        Paragraph lineSep = new Paragraph();
+        lineSep.setSpacingBefore(6f);
+        lineSep.setSpacingAfter(12f);
+        Chunk lineChunk = new Chunk(new com.lowagie.text.pdf.draw.LineSeparator(1.5f, 100, navyColor, Element.ALIGN_CENTER, -2f));
+        lineSep.add(lineChunk);
+        document.add(lineSep);
 
-        // Add loan balance to employee info if present
+        // ═══════════════════════════════════════════
+        //  EMPLOYEE DETAILS — 2-column side-by-side
+        // ═══════════════════════════════════════════
+        PdfPTable infoPanel = new PdfPTable(2);
+        infoPanel.setWidthPercentage(100);
+        infoPanel.setWidths(new float[]{1, 1});
+        infoPanel.setSpacingAfter(12f);
+
+        // Left column: Employee info
+        PdfPCell infoLeftCell = new PdfPCell();
+        infoLeftCell.setBorder(Rectangle.BOX);
+        infoLeftCell.setBorderColor(new java.awt.Color(220, 220, 220));
+        infoLeftCell.setBackgroundColor(lightGrayBg);
+        infoLeftCell.setPadding(10f);
+        infoLeftCell.setPaddingLeft(14f);
+
+        Paragraph empSectionTitle = new Paragraph("Employee Information",
+                new Font(Font.HELVETICA, 10, Font.BOLD, navyColor));
+        empSectionTitle.setSpacingAfter(6f);
+        infoLeftCell.addElement(empSectionTitle);
+
+        PdfPTable empInfoTable = new PdfPTable(2);
+        empInfoTable.setWidthPercentage(100);
+        empInfoTable.setWidths(new float[]{1, 2});
+        empInfoTable.getDefaultCell().setBorder(Rectangle.NO_BORDER);
+        empInfoTable.getDefaultCell().setPadding(2f);
+
+        addLandscapeInfoCell(empInfoTable, "Employee", employee.getFirstName() + " " + employee.getLastName(), labelFont, normalFont);
+        addLandscapeInfoCell(empInfoTable, "Employee #", employee.getEmployeeNumber(), labelFont, normalFont);
+        addLandscapeInfoCell(empInfoTable, "Department",
+                employee.getDepartment() != null ? employee.getDepartment().getName() : "-", labelFont, normalFont);
+        addLandscapeInfoCell(empInfoTable, "Position",
+                employee.getPosition() != null ? employee.getPosition() : "-", labelFont, normalFont);
+        addLandscapeInfoCell(empInfoTable, "NRC", employee.getNrc(), labelFont, normalFont);
+        addLandscapeInfoCell(empInfoTable, "Site",
+                entry.getSite() != null ? entry.getSite() : "-", labelFont, normalFont);
+        infoLeftCell.addElement(empInfoTable);
+        infoPanel.addCell(infoLeftCell);
+
+        // Right column: Bank & Loan info
+        PdfPCell infoRightCell = new PdfPCell();
+        infoRightCell.setBorder(Rectangle.BOX);
+        infoRightCell.setBorderColor(new java.awt.Color(220, 220, 220));
+        infoRightCell.setBackgroundColor(lightGrayBg);
+        infoRightCell.setPadding(10f);
+        infoRightCell.setPaddingLeft(14f);
+
+        Paragraph paySectionTitle = new Paragraph("Payment Information",
+                new Font(Font.HELVETICA, 10, Font.BOLD, navyColor));
+        paySectionTitle.setSpacingAfter(6f);
+        infoRightCell.addElement(paySectionTitle);
+
+        PdfPTable payInfoTable = new PdfPTable(2);
+        payInfoTable.setWidthPercentage(100);
+        payInfoTable.setWidths(new float[]{1, 2});
+        payInfoTable.getDefaultCell().setBorder(Rectangle.NO_BORDER);
+        payInfoTable.getDefaultCell().setPadding(2f);
+
+        addLandscapeInfoCell(payInfoTable, "Bank Name",
+                employee.getBankName() != null ? employee.getBankName() : "-", labelFont, normalFont);
+        addLandscapeInfoCell(payInfoTable, "Account #",
+                employee.getAccountNumber() != null ? employee.getAccountNumber() : "-", labelFont, normalFont);
+
         BigDecimal loanBal = entry.getLoanBalance() != null ? entry.getLoanBalance() : BigDecimal.ZERO;
         BigDecimal loanDed = entry.getLoanDeduction() != null ? entry.getLoanDeduction() : BigDecimal.ZERO;
-        if (loanBal.compareTo(BigDecimal.ZERO) > 0 || loanDed.compareTo(BigDecimal.ZERO) > 0) {
-            addInfoCell(infoTable, "Loan Balance:", fmt.format(loanBal), boldFont, normalFont);
-            addInfoCell(infoTable, "Monthly Deduction:", fmt.format(loanDed), boldFont, normalFont);
+        boolean hasLoan = loanBal.compareTo(BigDecimal.ZERO) > 0 || loanDed.compareTo(BigDecimal.ZERO) > 0;
+        if (hasLoan) {
+            addLandscapeInfoCell(payInfoTable, "Loan Balance", fmt.format(loanBal), labelFont, normalFont);
+            addLandscapeInfoCell(payInfoTable, "Loan Deduction", fmt.format(loanDed), labelFont, normalFont);
         }
+        infoRightCell.addElement(payInfoTable);
+        infoPanel.addCell(infoRightCell);
 
-        document.add(infoTable);
+        document.add(infoPanel);
 
-        // --- Separator ---
-        Paragraph separator = new Paragraph(new Chunk(new com.lowagie.text.pdf.draw.LineSeparator()));
-        separator.setSpacingAfter(10f);
-        document.add(separator);
+        // ═══════════════════════════════════════════
+        //  EARNINGS & DEDUCTIONS — Side by side
+        // ═══════════════════════════════════════════
+        PdfPTable financialPanel = new PdfPTable(2);
+        financialPanel.setWidthPercentage(100);
+        financialPanel.setWidths(new float[]{1, 1});
+        financialPanel.setSpacingAfter(8f);
 
-        // --- Earnings Table ---
-        PdfPTable earningsTable = createStyledTable(new float[]{3, 1, 1, 1});
-        earningsTable.setSpacingAfter(10f);
-        addTableHeader(earningsTable, new String[]{"Earnings", "Rate/Hr", "Hours/Days", "Amount"}, headerFont);
+        // ── Left: Earnings Table ──
+        PdfPCell earningsCell = new PdfPCell();
+        earningsCell.setBorder(Rectangle.NO_BORDER);
+        earningsCell.setPaddingRight(6f);
+
+        PdfPTable earningsTable = new PdfPTable(new float[]{3f, 1.2f, 1f, 1.5f});
+        earningsTable.setWidthPercentage(100);
+        earningsTable.setSpacingAfter(4f);
+
+        // Earnings header
+        addStyledHeader(earningsTable, new String[]{"Earnings", "Rate/Hr", "Hrs/Days", "Amount (ZMW)"}, headerBg, whiteFont);
 
         addAmountRow(earningsTable, "Present (" + entry.getPresentDays().stripTrailingZeros().toPlainString() + " days)",
                 entry.getHourlyRate(), entry.getRegularHours(), entry.getRegularAmount(), normalFont);
@@ -250,26 +320,34 @@ public class PayslipServiceImpl implements PayslipService {
                 .add(entry.getOvertimeAmount() != null ? entry.getOvertimeAmount() : BigDecimal.ZERO)
                 .add(entry.getHolidayAmount() != null ? entry.getHolidayAmount() : BigDecimal.ZERO);
 
-        addTotalRow(earningsTable, "Gross Salary", totalEarnings, fmt, boldFont);
-        document.add(earningsTable);
+        addStyledTotalRow(earningsTable, "Gross Salary", totalEarnings, fmt, boldFont, totalBg);
+        earningsCell.addElement(earningsTable);
+        financialPanel.addCell(earningsCell);
 
-        // --- Deductions Table ---
-        PdfPTable deductionsTable = createStyledTable(new float[]{3, 1, 1});
-        deductionsTable.setSpacingAfter(10f);
-        addTableHeader(deductionsTable, new String[]{"Deductions", "", "Amount"}, headerFont);
+        // ── Right: Deductions Table ──
+        PdfPCell deductionsCell = new PdfPCell();
+        deductionsCell.setBorder(Rectangle.NO_BORDER);
+        deductionsCell.setPaddingLeft(6f);
 
-        addDeductionRow(deductionsTable, "NHIMA (" + formatPercent(entry, e -> e.getNhima(), totalEarnings) + ")",
+        PdfPTable deductionsTable = new PdfPTable(new float[]{3f, 1f, 1.5f});
+        deductionsTable.setWidthPercentage(100);
+        deductionsTable.setSpacingAfter(4f);
+
+        // Deductions header
+        addStyledHeader(deductionsTable, new String[]{"Deductions", "Rate", "Amount (ZMW)"}, headerBg, whiteFont);
+
+        addDeductionRow(deductionsTable, "NHIMA", formatPercent(entry, e -> e.getNhima(), totalEarnings),
                 entry.getNhima(), normalFont, fmt);
-        addDeductionRow(deductionsTable, "NAPSA (" + formatPercent(entry, e -> e.getNapsa(), totalEarnings) + ")",
+        addDeductionRow(deductionsTable, "NAPSA", formatPercent(entry, e -> e.getNapsa(), totalEarnings),
                 entry.getNapsa(), normalFont, fmt);
 
         BigDecimal loan = entry.getLoanDeduction() != null ? entry.getLoanDeduction() : BigDecimal.ZERO;
         if (loan.compareTo(BigDecimal.ZERO) > 0) {
-            addDeductionRow(deductionsTable, "Loan Deduction", loan, normalFont, fmt);
+            addDeductionRow(deductionsTable, "Loan Deduction", "", loan, normalFont, fmt);
         }
         BigDecimal other = entry.getOtherDeductions() != null ? entry.getOtherDeductions() : BigDecimal.ZERO;
         if (other.compareTo(BigDecimal.ZERO) > 0) {
-            addDeductionRow(deductionsTable, "Other Deductions", other, normalFont, fmt);
+            addDeductionRow(deductionsTable, "Other Deductions", "", other, normalFont, fmt);
         }
 
         BigDecimal totalDeductions = entry.getNhima()
@@ -277,74 +355,95 @@ public class PayslipServiceImpl implements PayslipService {
                 .add(loan)
                 .add(other);
 
-        addTotalRow(deductionsTable, "Total Deductions", totalDeductions, fmt, boldFont);
-        document.add(deductionsTable);
+        addStyledTotalRow(deductionsTable, "Total Deductions", totalDeductions, fmt, boldFont, totalBg);
+        deductionsCell.addElement(deductionsTable);
+        financialPanel.addCell(deductionsCell);
 
-        // --- Separator ---
-        document.add(separator);
+        document.add(financialPanel);
 
-        // --- Net Salary (highlighted) ---
-        Paragraph netLabel = new Paragraph("Net Salary", headerFont);
-        netLabel.setSpacingBefore(5f);
-        document.add(netLabel);
+        // ═══════════════════════════════════════════
+        //  NET SALARY — Highlighted Box
+        // ═══════════════════════════════════════════
+        PdfPTable netTable = new PdfPTable(1);
+        netTable.setWidthPercentage(60);
+        netTable.setHorizontalAlignment(Element.ALIGN_CENTER);
+        netTable.setSpacingAfter(16f);
 
-        Paragraph netAmount = new Paragraph(fmt.format(entry.getNetSalary()), highlightFont);
-        netAmount.setSpacingAfter(20f);
-        document.add(netAmount);
+        PdfPCell netCell = new PdfPCell();
+        netCell.setBackgroundColor(accentColor);
+        netCell.setPadding(10f);
+        netCell.setPaddingTop(6f);
+        netCell.setPaddingBottom(6f);
+        netCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        netCell.setBorder(Rectangle.BOX);
+        netCell.setBorderColor(accentColor);
 
-        // --- Footer ---
-        Font footerFont = new Font(Font.HELVETICA, 8, Font.ITALIC);
+        Paragraph netLabel = new Paragraph("NET SALARY",
+                new Font(Font.HELVETICA, 11, Font.BOLD, java.awt.Color.WHITE));
+        netLabel.setSpacingAfter(2f);
+        netCell.addElement(netLabel);
+        Paragraph netAmount = new Paragraph(fmt.format(entry.getNetSalary()),
+                new Font(Font.HELVETICA, 22, Font.BOLD, java.awt.Color.WHITE));
+        netCell.addElement(netAmount);
+        netTable.addCell(netCell);
+        document.add(netTable);
+
+        // ═══════════════════════════════════════════
+        //  FOOTER
+        // ═══════════════════════════════════════════
+        Paragraph footerLine = new Paragraph();
+        footerLine.setSpacingBefore(4f);
+        footerLine.setSpacingAfter(6f);
+        Chunk footerChunk = new Chunk(new com.lowagie.text.pdf.draw.LineSeparator(0.5f, 100, new java.awt.Color(200, 200, 200), Element.ALIGN_CENTER, -2f));
+        footerLine.add(footerChunk);
+        document.add(footerLine);
+
         Paragraph footerCompany = new Paragraph(
-                "Musunga Engineering Services Ltd",
+                "Musunga Engineering Services Ltd | Payroll Department",
                 new Font(Font.HELVETICA, 9, Font.BOLD, navyColor));
         footerCompany.setAlignment(Element.ALIGN_CENTER);
-        footerCompany.setSpacingAfter(2f);
+        footerCompany.setSpacingAfter(1f);
         document.add(footerCompany);
-        Paragraph footer = new Paragraph(
+        Paragraph footerNote = new Paragraph(
                 "Generated on " + LocalDateTime.now().toLocalDate() + " | This is a computer-generated document.",
-                footerFont);
-        footer.setAlignment(Element.ALIGN_CENTER);
-        document.add(footer);
+                new Font(Font.HELVETICA, 7, Font.ITALIC, new java.awt.Color(150, 150, 150)));
+        footerNote.setAlignment(Element.ALIGN_CENTER);
+        document.add(footerNote);
 
         document.close();
         return baos.toByteArray();
     }
 
-    private PdfPTable createStyledTable(float[] widths) {
-        PdfPTable table = new PdfPTable(widths);
-        table.setWidthPercentage(100);
-        return table;
-    }
-
-    private void addTableHeader(PdfPTable table, String[] headers, Font font) {
-        java.awt.Color navyColor = new java.awt.Color(13, 71, 161);
-        Font whiteFont = new Font(Font.HELVETICA, 12, Font.BOLD, java.awt.Color.WHITE);
+    // ── Landscape-optimized styled header ──
+    private void addStyledHeader(PdfPTable table, String[] headers, java.awt.Color bgColor, Font font) {
         for (String header : headers) {
-            PdfPCell cell = new PdfPCell(new Phrase(header, whiteFont));
-            cell.setBackgroundColor(navyColor);
-            cell.setPadding(5f);
-            cell.setHorizontalAlignment(header.equals("Earnings") || header.equals("Deductions")
-                    ? Element.ALIGN_LEFT : Element.ALIGN_RIGHT);
+            PdfPCell cell = new PdfPCell(new Phrase(header, font));
+            cell.setBackgroundColor(bgColor);
+            cell.setPadding(6f);
+            cell.setHorizontalAlignment(Element.ALIGN_CENTER);
+            cell.setBorder(Rectangle.NO_BORDER);
             table.addCell(cell);
         }
     }
 
-    private void addInfoCell(PdfPTable table, String label, String value, Font labelFont, Font valueFont) {
+    // ── Employee info rows for landscape layout ──
+    private void addLandscapeInfoCell(PdfPTable table, String label, String value, Font labelFont, Font valueFont) {
         PdfPCell labelCell = new PdfPCell(new Phrase(label, labelFont));
         labelCell.setBorder(Rectangle.NO_BORDER);
         labelCell.setPadding(2f);
-        labelCell.setFixedHeight(18f);
-        labelCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
-        // label column width is controlled by the table's column widths
+        labelCell.setPaddingLeft(0f);
+        labelCell.setFixedHeight(17f);
+        labelCell.setHorizontalAlignment(Element.ALIGN_LEFT);
         table.addCell(labelCell);
 
         PdfPCell valueCell = new PdfPCell(new Phrase(value, valueFont));
         valueCell.setBorder(Rectangle.NO_BORDER);
         valueCell.setPadding(2f);
-        valueCell.setFixedHeight(18f);
+        valueCell.setFixedHeight(17f);
         table.addCell(valueCell);
     }
 
+    // ── Earnings row ──
     private void addAmountRow(PdfPTable table, String label, BigDecimal rate, BigDecimal hours, BigDecimal amount, Font font) {
         table.addCell(new Phrase(label, font));
         PdfPCell rateCell = new PdfPCell(new Phrase(
@@ -362,31 +461,43 @@ public class PayslipServiceImpl implements PayslipService {
         table.addCell(amountCell);
     }
 
-    private void addDeductionRow(PdfPTable table, String label, BigDecimal amount, Font font, NumberFormat fmt) {
+    // ── Deduction row with rate column ──
+    private void addDeductionRow(PdfPTable table, String label, String rateStr, BigDecimal amount, Font font, NumberFormat fmt) {
         table.addCell(new Phrase(label, font));
-        PdfPCell emptyCell = new PdfPCell(new Phrase("", font));
-        emptyCell.setBorder(Rectangle.NO_BORDER);
-        table.addCell(emptyCell);
+        PdfPCell rateCell = new PdfPCell(new Phrase(rateStr != null && !rateStr.isEmpty() ? rateStr : "", font));
+        rateCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+        table.addCell(rateCell);
         PdfPCell amountCell = new PdfPCell(new Phrase(fmt.format(amount != null ? amount : BigDecimal.ZERO), font));
         amountCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
         table.addCell(amountCell);
     }
 
-    private void addTotalRow(PdfPTable table, String label, BigDecimal amount, NumberFormat fmt, Font font) {
-        PdfPCell labelCell = new PdfPCell(new Phrase(label, font));
-        labelCell.setBorder(Rectangle.TOP);
-        labelCell.setPaddingTop(4f);
-        table.addCell(labelCell);
+    // ── Total row with background highlight ──
+    private void addStyledTotalRow(PdfPTable table, String label, BigDecimal amount, NumberFormat fmt, Font font, java.awt.Color bgColor) {
+        int cols = table.getNumberOfColumns();
 
-        PdfPCell spacerCell = new PdfPCell(new Phrase("", font));
-        spacerCell.setBorder(Rectangle.TOP);
-        spacerCell.setPaddingTop(4f);
-        table.addCell(spacerCell);
+        for (int i = 0; i < cols - 1; i++) {
+            PdfPCell cell;
+            if (i == 0) {
+                cell = new PdfPCell(new Phrase(label, font));
+            } else {
+                cell = new PdfPCell(new Phrase("", font));
+            }
+            cell.setBorder(Rectangle.TOP);
+            cell.setBorderColor(new java.awt.Color(13, 71, 161));
+            cell.setPaddingTop(5f);
+            cell.setPaddingBottom(3f);
+            cell.setBackgroundColor(bgColor);
+            table.addCell(cell);
+        }
 
         PdfPCell amountCell = new PdfPCell(new Phrase(fmt.format(amount), font));
         amountCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
         amountCell.setBorder(Rectangle.TOP);
-        amountCell.setPaddingTop(4f);
+        amountCell.setBorderColor(new java.awt.Color(13, 71, 161));
+        amountCell.setPaddingTop(5f);
+        amountCell.setPaddingBottom(3f);
+        amountCell.setBackgroundColor(bgColor);
         table.addCell(amountCell);
     }
 
@@ -485,6 +596,51 @@ public class PayslipServiceImpl implements PayslipService {
 
         payslip.setEmailedAt(LocalDateTime.now());
         payslipRepository.save(payslip);
+    }
+
+    @Override
+    public byte[] downloadPayslipsByMonth(int month, int year) {
+        List<Payslip> payslips = payslipRepository.findByMonthAndYear(month, year);
+
+        if (payslips.isEmpty()) {
+            throw new BusinessRuleException("No payslips found for " + MONTH_NAMES[month - 1] + " " + year);
+        }
+
+        try {
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            try (ZipOutputStream zos = new ZipOutputStream(baos)) {
+                for (Payslip payslip : payslips) {
+                    String pdfPath = payslip.getPdfPath();
+                    if (pdfPath == null) {
+                        log.warn("Payslip {} has no PDF file — skipping", payslip.getId());
+                        continue;
+                    }
+
+                    try {
+                        var resource = fileStorageService.loadFile(pdfPath);
+                        byte[] pdfBytes;
+                        try (var is = resource.getInputStream()) {
+                            pdfBytes = is.readAllBytes();
+                        }
+
+                        String employeeName = payslip.getPayrollEntry().getEmployee().getFirstName()
+                                + "_" + payslip.getPayrollEntry().getEmployee().getLastName();
+                        String entryName = employeeName + ".pdf";
+
+                        ZipEntry zipEntry = new ZipEntry(entryName);
+                        zipEntry.setSize(pdfBytes.length);
+                        zos.putNextEntry(zipEntry);
+                        zos.write(pdfBytes);
+                        zos.closeEntry();
+                    } catch (IOException e) {
+                        log.error("Failed to read payslip {}: {}", payslip.getId(), e.getMessage());
+                    }
+                }
+            }
+            return baos.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to create ZIP file", e);
+        }
     }
 
     @Override

@@ -8,4 +8,8 @@ export const payslipService = {
   download: (id) => api.get(`/payslips/${id}/download`, { responseType: 'blob' }),
   emailAll: (payrollRunId) => api.post(`/payroll-runs/${payrollRunId}/email-payslips`),
   downloadZip: (payrollRunId) => api.get(`/payslips/download-zip/${payrollRunId}`, { responseType: 'blob' }),
+  downloadByMonth: (month, year) => api.get('/payslips/download-by-month', {
+    params: { month, year },
+    responseType: 'blob',
+  }),
 };
