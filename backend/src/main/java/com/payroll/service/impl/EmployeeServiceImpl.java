@@ -69,6 +69,11 @@ public class EmployeeServiceImpl implements EmployeeService {
             throw new DuplicateResourceException("Employee number already exists");
         }
 
+        if (request.getEmail() != null && !request.getEmail().isBlank()
+                && employeeRepository.existsByEmail(request.getEmail())) {
+            throw new DuplicateResourceException("Email '" + request.getEmail() + "' is already in use by another employee");
+        }
+
         Department department = null;
         if (request.getDepartmentId() != null) {
             department = departmentRepository.findById(request.getDepartmentId())
@@ -91,6 +96,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .status(EmployeeStatus.ACTIVE)
                 .salaryType(request.getSalaryType() != null ? SalaryType.valueOf(request.getSalaryType()) : SalaryType.MONTHLY)
                 .employmentType(request.getEmploymentType() != null ? EmploymentType.valueOf(request.getEmploymentType()) : EmploymentType.FULL_TIME)
+                .dateHired(request.getDateHired())
                 .department(department)
                 .build();
 
@@ -103,6 +109,13 @@ public class EmployeeServiceImpl implements EmployeeService {
     public EmployeeResponse updateEmployee(UUID id, EmployeeRequest request) {
         Employee employee = employeeRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Employee", id));
+
+        // Check for duplicate email if the email is being changed
+        if (request.getEmail() != null && !request.getEmail().isBlank()
+                && !request.getEmail().equals(employee.getEmail())
+                && employeeRepository.existsByEmail(request.getEmail())) {
+            throw new DuplicateResourceException("Email '" + request.getEmail() + "' is already in use by another employee");
+        }
 
         Department department = null;
         if (request.getDepartmentId() != null) {
@@ -124,6 +137,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         employee.setSortCode(request.getSortCode());
         employee.setSalaryType(request.getSalaryType() != null ? SalaryType.valueOf(request.getSalaryType()) : null);
         employee.setEmploymentType(request.getEmploymentType() != null ? EmploymentType.valueOf(request.getEmploymentType()) : null);
+        employee.setDateHired(request.getDateHired());
         employee.setDepartment(department);
 
         Employee saved = employeeRepository.save(employee);
@@ -211,6 +225,15 @@ public class EmployeeServiceImpl implements EmployeeService {
                         continue;
                     }
 
+                    if (employee.getEmail() != null && !employee.getEmail().isBlank()
+                            && employeeRepository.existsByEmail(employee.getEmail())) {
+                        errors.add(Map.of(
+                                "row", String.valueOf(row.getRowNum() + 1),
+                                "error", "Email already in use: " + employee.getEmail()
+                        ));
+                        continue;
+                    }
+
                     employeeRepository.save(employee);
                     imported++;
 
@@ -272,6 +295,7 @@ public class EmployeeServiceImpl implements EmployeeService {
                 .employmentType(employee.getEmploymentType() != null ? employee.getEmploymentType().name() : null)
                 .departmentId(employee.getDepartment() != null ? employee.getDepartment().getId() : null)
                 .departmentName(employee.getDepartment() != null ? employee.getDepartment().getName() : null)
+                .dateHired(employee.getDateHired())
                 .createdAt(employee.getCreatedAt())
                 .build();
     }

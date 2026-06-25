@@ -4,6 +4,7 @@ import com.payroll.entity.AuditLog;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -31,4 +32,8 @@ public interface AuditLogRepository extends JpaRepository<AuditLog, UUID> {
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate,
             Pageable pageable);
+
+    @Modifying
+    @Query("UPDATE AuditLog a SET a.user = null WHERE a.user.id = :userId")
+    void nullifyUserId(@Param("userId") UUID userId);
 }

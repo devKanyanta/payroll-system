@@ -3,9 +3,11 @@ package com.payroll.service.impl;
 import com.payroll.dto.DepartmentRequest;
 import com.payroll.dto.DepartmentResponse;
 import com.payroll.entity.Department;
+import com.payroll.exception.BusinessRuleException;
 import com.payroll.exception.DuplicateResourceException;
 import com.payroll.exception.ResourceNotFoundException;
 import com.payroll.repository.DepartmentRepository;
+import com.payroll.repository.EmployeeRepository;
 import com.payroll.service.DepartmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,6 +21,7 @@ import java.util.UUID;
 public class DepartmentServiceImpl implements DepartmentService {
 
     private final DepartmentRepository departmentRepository;
+    private final EmployeeRepository employeeRepository;
 
     @Override
     public List<DepartmentResponse> getAllDepartments() {
@@ -71,6 +74,15 @@ public class DepartmentServiceImpl implements DepartmentService {
     public void deleteDepartment(UUID id) {
         Department department = departmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Department", id));
+
+        if (employeeRepository.existsByDepartmentId(id)) {
+            throw new BusinessRuleException(
+                    "Cannot delete department '" + department.getName() +
+                    "' because it is linked to one or more employees. " +
+                    "Please reassign or remove those employees first before deleting this department."
+            );
+        }
+
         departmentRepository.delete(department);
     }
 

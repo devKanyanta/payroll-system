@@ -43,7 +43,7 @@ function StatusChip({ status }) {
 const emptyEmployee = {
   firstName: '', lastName: '', email: '', phone: '', nrc: '',
   departmentId: '', position: '', site: '', employmentType: 'FULL_TIME',
-  salaryType: 'MONTHLY', bankName: '', accountNumber: '',
+  salaryType: 'MONTHLY', bankName: '', sortCode: '', accountNumber: '',
   dateHired: '', rate: '', status: 'ACTIVE', employeeNumber: '',
 };
 
@@ -79,6 +79,9 @@ export default function Employees() {
       const res = await employeeService.getAll(params);
       return res.data;
     },
+    // Pause background refetches while the form dialog is open
+    // so typing in form fields doesn't trigger distracting data reloads
+    enabled: !dialogOpen,
   });
 
   const createMutation = useMutation({
@@ -121,7 +124,7 @@ export default function Employees() {
       phone: emp.phone || '', nrc: emp.nrc, departmentId: emp.departmentId || '',
       position: emp.position || '', site: emp.site || '', employmentType: emp.employmentType,
       salaryType: emp.salaryType, bankName: emp.bankName || '',
-      accountNumber: emp.accountNumber || '',
+      sortCode: emp.sortCode || '', accountNumber: emp.accountNumber || '',
       dateHired: emp.dateHired, rate: emp.rate || '',
       status: emp.status, employeeNumber: emp.employeeNumber,
     });
@@ -147,7 +150,8 @@ export default function Employees() {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
-  if (isLoading) return <LoadingScreen />;
+  // Only show loading screen on initial page load, not on background refetches
+  if (isLoading && !pageData) return <LoadingScreen />;
 
   return (
     <Box>
@@ -263,8 +267,8 @@ export default function Employees() {
             </Grid>
             <Grid item xs={6} sm={3} md={2}>
               <FormControl fullWidth size="small">
-                <InputLabel>Status</InputLabel>
-                <Select value={statusFilter} label="Status" onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}>
+                <InputLabel id="filter-status-label">Status</InputLabel>
+                <Select labelId="filter-status-label" id="filter-status-select" value={statusFilter} label="Status" onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}>
                   <MenuItem value="">All</MenuItem>
                   <MenuItem value="ACTIVE">Active</MenuItem>
                   <MenuItem value="INACTIVE">Inactive</MenuItem>
@@ -274,8 +278,8 @@ export default function Employees() {
             </Grid>
             <Grid item xs={6} sm={3} md={2}>
               <FormControl fullWidth size="small">
-                <InputLabel>Department</InputLabel>
-                <Select value={departmentFilter} label="Department" onChange={(e) => { setDepartmentFilter(e.target.value); setPage(0); }}>
+                <InputLabel id="filter-dept-label">Department</InputLabel>
+                <Select labelId="filter-dept-label" id="filter-dept-select" value={departmentFilter} label="Department" onChange={(e) => { setDepartmentFilter(e.target.value); setPage(0); }}>
                   <MenuItem value="">All</MenuItem>
                   {departments?.map((d) => (
                     <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>
@@ -411,7 +415,7 @@ export default function Employees() {
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid item xs={12} sm={4}>
               <TextField fullWidth label="Employee #" value={form.employeeNumber} onChange={handleChange('employeeNumber')}
-                helperText={errors.employeeNumber} error={!!errors.employeeNumber} />
+                helperText={errors.employeeNumber} error={!!errors.employeeNumber} autoFocus />
             </Grid>
             <Grid item xs={12} sm={4}>
               <TextField fullWidth label="First Name *" value={form.firstName} onChange={handleChange('firstName')}
@@ -434,8 +438,8 @@ export default function Employees() {
             </Grid>
             <Grid item xs={12} sm={4}>
               <FormControl fullWidth>
-                <InputLabel>Department</InputLabel>
-                <Select value={form.departmentId} label="Department" onChange={handleChange('departmentId')}>
+                <InputLabel id="form-dept-label">Department</InputLabel>
+                <Select labelId="form-dept-label" id="form-dept-select" value={form.departmentId} label="Department" onChange={handleChange('departmentId')}>
                   <MenuItem value="">None</MenuItem>
                   {departments?.map((d) => <MenuItem key={d.id} value={d.id}>{d.name}</MenuItem>)}
                 </Select>
@@ -449,8 +453,8 @@ export default function Employees() {
             </Grid>
             <Grid item xs={12} sm={4}>
               <FormControl fullWidth>
-                <InputLabel>Employment Type *</InputLabel>
-                <Select value={form.employmentType} label="Employment Type *" onChange={handleChange('employmentType')} required>
+                <InputLabel id="form-employment-type-label">Employment Type *</InputLabel>
+                <Select labelId="form-employment-type-label" id="form-employment-type-select" value={form.employmentType} label="Employment Type *" onChange={handleChange('employmentType')} required>
                   <MenuItem value="FULL_TIME">Full Time</MenuItem>
                   <MenuItem value="PART_TIME">Part Time</MenuItem>
                   <MenuItem value="CONTRACT">Contract</MenuItem>
@@ -459,8 +463,8 @@ export default function Employees() {
             </Grid>
             <Grid item xs={12} sm={4}>
               <FormControl fullWidth>
-                <InputLabel>Salary Type *</InputLabel>
-                <Select value={form.salaryType} label="Salary Type *" onChange={handleChange('salaryType')} required>
+                <InputLabel id="form-salary-type-label">Salary Type *</InputLabel>
+                <Select labelId="form-salary-type-label" id="form-salary-type-select" value={form.salaryType} label="Salary Type *" onChange={handleChange('salaryType')} required>
                   <MenuItem value="MONTHLY">Monthly</MenuItem>
                   <MenuItem value="HOURLY">Hourly</MenuItem>
                 </Select>
@@ -478,13 +482,17 @@ export default function Employees() {
               <TextField fullWidth label="Bank Name" value={form.bankName} onChange={handleChange('bankName')} />
             </Grid>
             <Grid item xs={12} sm={4}>
+              <TextField fullWidth label="Sort Code" value={form.sortCode} onChange={handleChange('sortCode')}
+                helperText="Format: XX-XX-XX" placeholder="00-00-00" />
+            </Grid>
+            <Grid item xs={12} sm={4}>
               <TextField fullWidth label="Account Number" value={form.accountNumber} onChange={handleChange('accountNumber')} />
             </Grid>
             {editId && (
               <Grid item xs={12} sm={4}>
                 <FormControl fullWidth>
-                  <InputLabel>Status</InputLabel>
-                  <Select value={form.status} label="Status" onChange={handleChange('status')}>
+                  <InputLabel id="form-status-label">Status</InputLabel>
+                  <Select labelId="form-status-label" id="form-status-select" value={form.status} label="Status" onChange={handleChange('status')}>
                     <MenuItem value="ACTIVE">Active</MenuItem>
                     <MenuItem value="INACTIVE">Inactive</MenuItem>
                     <MenuItem value="TERMINATED">Terminated</MenuItem>

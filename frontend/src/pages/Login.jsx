@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   TextField, Button, Typography, Alert, Box, Link, InputAdornment,
-  IconButton,
+  IconButton, FormControlLabel, Checkbox,
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
@@ -11,6 +11,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -21,7 +22,7 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       navigate('/dashboard');
     } catch (err) {
       const message = err.response?.data?.message || 'Invalid email or password';
@@ -73,7 +74,19 @@ export default function Login() {
         }}
       />
 
-      <Box sx={{ textAlign: 'right', mb: 2 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              size="small"
+            />
+          }
+          label={
+            <Typography variant="body2">Keep me logged in</Typography>
+          }
+        />
         <Link component={RouterLink} to="/forgot-password" variant="body2">
           Forgot password?
         </Link>

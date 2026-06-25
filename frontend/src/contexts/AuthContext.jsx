@@ -20,8 +20,8 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  const login = useCallback(async (email, password) => {
-    const response = await authService.login({ email, password });
+  const login = useCallback(async (email, password, rememberMe = false) => {
+    const response = await authService.login({ email, password, rememberMe });
     const { accessToken, refreshToken, role, firstName, lastName, id } = response.data;
     const userData = { id, email, role, firstName, lastName };
     localStorage.setItem('accessToken', accessToken);

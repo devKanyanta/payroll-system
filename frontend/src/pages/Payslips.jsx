@@ -4,6 +4,7 @@ import {
   Box, Typography, MenuItem, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Chip, Card, CardContent, IconButton, Tooltip, Stack, alpha, useTheme,
   Autocomplete, TextField, Grid, Button, FormControl, Select, InputLabel,
+  Snackbar, Alert,
 } from '@mui/material';
 import {
   Download, Email, PictureAsPdf, CheckCircle, Cancel,
@@ -42,6 +43,7 @@ export default function Payslips() {
 
   // ── Bulk download state ──
   const [downloading, setDownloading] = useState(false);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
 
   // ── Fetch employees list ──
   const { data: employees } = useQuery({
@@ -66,7 +68,11 @@ export default function Payslips() {
   // ── Email mutation ──
   const emailMutation = useMutation({
     mutationFn: (id) => payslipService.email(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['payslips'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payslips'] });
+      setSnackbar({ open: true, message: 'Payslip emailed successfully', severity: 'success' });
+    },
+    onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to email payslip', severity: 'error' }),
   });
 
   // ── Download single payslip handler ──
@@ -83,7 +89,7 @@ export default function Payslips() {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Failed to download payslip:', err);
+      setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to download payslip', severity: 'error' });
     }
   };
 
@@ -102,11 +108,10 @@ export default function Payslips() {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err) {
-      console.error('Failed to download bulk payslips:', err);
       if (err.response?.status === 400 || err.response?.status === 404) {
-        alert(`No payslips found for ${MONTHS[bulkMonth - 1]} ${bulkYear}. Please ensure payslips have been generated for this period.`);
+        setSnackbar({ open: true, message: `No payslips found for ${MONTHS[bulkMonth - 1]} ${bulkYear}. Please ensure payslips have been generated for this period.`, severity: 'warning' });
       } else {
-        alert('Failed to download payslips. Please try again.');
+        setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to download payslips. Please try again.', severity: 'error' });
       }
     } finally {
       setDownloading(false);
@@ -546,6 +551,17 @@ export default function Payslips() {
           </TableContainer>
         </Card>
       )}
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar((p) => ({ ...p, open: false }))} severity={snackbar.severity} variant="filled">
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

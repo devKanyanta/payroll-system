@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface PayrollImportRepository extends JpaRepository<PayrollImport, UUID> {
     List<PayrollImport> findByPayrollRunIdOrderByCreatedAtDesc(UUID payrollRunId);
+    boolean existsByCreatedById(UUID createdById);
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Box, Typography, Button, Card, CardContent, Grid, TextField,
-  Select, MenuItem, FormControl, InputLabel, Stack, alpha,
+  Select, MenuItem, FormControl, InputLabel, Stack, alpha, Snackbar, Alert,
 } from '@mui/material';
 import {
   Download, PictureAsPdf, People, Receipt, AccountBalance,
@@ -59,6 +59,7 @@ export default function Reports() {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [deptId, setDeptId] = useState('');
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
 
   const { data: departments } = useQuery({
     queryKey: ['departments'],
@@ -87,12 +88,16 @@ export default function Reports() {
 
   const handleExportExcel = async () => {
     try { await reportService.exportExcel(month, year); }
-    catch (err) { console.error('Excel export failed:', err); }
+    catch (err) {
+      setSnackbar({ open: true, message: err.response?.data?.message || 'Excel export failed. Please try again.', severity: 'error' });
+    }
   };
 
   const handleExportPdf = async () => {
     try { await reportService.exportPdf(month, year); }
-    catch (err) { console.error('PDF export failed:', err); }
+    catch (err) {
+      setSnackbar({ open: true, message: err.response?.data?.message || 'PDF export failed. Please try again.', severity: 'error' });
+    }
   };
 
   const formatCurrency = (value) => {
@@ -275,6 +280,17 @@ export default function Reports() {
           )}
         </CardContent>
       </Card>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar((p) => ({ ...p, open: false }))} severity={snackbar.severity} variant="filled">
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

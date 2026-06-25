@@ -27,23 +27,46 @@ public class JwtUtils {
     }
 
     public String generateAccessToken(UUID userId, String email, String role) {
+        return generateAccessToken(userId, email, role, accessTokenExpiration);
+    }
+
+    public String generateAccessToken(UUID userId, String email, String role, long customExpirationMs) {
         return Jwts.builder()
                 .subject(userId.toString())
                 .claim("email", email)
                 .claim("role", role)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
+                .expiration(new Date(System.currentTimeMillis() + customExpirationMs))
                 .signWith(secretKey)
                 .compact();
     }
 
     public String generateRefreshToken(UUID userId) {
+        return generateRefreshToken(userId, refreshTokenExpiration, false);
+    }
+
+    public String generateRefreshToken(UUID userId, long customExpirationMs) {
+        return generateRefreshToken(userId, customExpirationMs, false);
+    }
+
+    public String generateRefreshToken(UUID userId, long customExpirationMs, boolean rememberMe) {
         return Jwts.builder()
                 .subject(userId.toString())
+                .claim("rememberMe", rememberMe)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + refreshTokenExpiration))
+                .expiration(new Date(System.currentTimeMillis() + customExpirationMs))
                 .signWith(secretKey)
                 .compact();
+    }
+
+    public boolean isRememberMeToken(String token) {
+        try {
+            Claims claims = parseToken(token);
+            Boolean rememberMe = claims.get("rememberMe", Boolean.class);
+            return rememberMe != null && rememberMe;
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
     }
 
     public UUID getUserIdFromToken(String token) {
@@ -76,6 +99,10 @@ public class JwtUtils {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+    }
+
+    public long getAccessTokenExpirationMs() {
+        return accessTokenExpiration;
     }
 
     public long getRefreshTokenExpirationMs() {

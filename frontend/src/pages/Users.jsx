@@ -5,7 +5,7 @@ import {
   FormControl, InputLabel, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Chip, Card, CardContent,
   IconButton, TablePagination, Dialog, DialogTitle, DialogContent,
-  DialogActions, Switch, FormControlLabel,
+  DialogActions, Switch, FormControlLabel, Snackbar, Alert,
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 import { userService } from '../services/userService';
@@ -23,6 +23,7 @@ export default function Users() {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(emptyUser);
   const [deleteId, setDeleteId] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
   const queryClient = useQueryClient();
 
   const { data: pageData, isLoading } = useQuery({
@@ -36,16 +37,22 @@ export default function Users() {
   const createMutation = useMutation({
     mutationFn: (data) => userService.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); closeDialog(); },
+    onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to create user', severity: 'error' }),
   });
 
   const updateMutation = useMutation({
     mutationFn: (data) => userService.update(editId, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); closeDialog(); },
+    onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to update user', severity: 'error' }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => userService.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['users'] }); setDeleteId(null); },
+    onError: (err) => {
+      setDeleteId(null);
+      setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to delete user', severity: 'error' });
+    },
   });
 
   const openCreate = () => { setEditId(null); setForm(emptyUser); setDialogOpen(true); };
@@ -150,6 +157,17 @@ export default function Users() {
       <ConfirmDialog open={!!deleteId} title="Delete User" color="error"
         message="Are you sure you want to delete this user?"
         onConfirm={() => deleteMutation.mutate(deleteId)} onCancel={() => setDeleteId(null)} />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar((p) => ({ ...p, open: false }))} severity={snackbar.severity} variant="filled">
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

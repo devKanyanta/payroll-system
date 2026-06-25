@@ -83,6 +83,25 @@ public class PayslipServiceImpl implements PayslipService {
     @Override
     @Transactional
     public void generatePayslips(UUID payrollRunId) {
+        // First, clean up any existing payslips for this payroll run to prevent duplicates
+        List<Payslip> existing = payslipRepository.findByPayrollRunId(payrollRunId);
+        if (!existing.isEmpty()) {
+            log.info("Cleaning up {} existing payslip(s) for payroll run {} before regenerating",
+                    existing.size(), payrollRunId);
+            for (Payslip payslip : existing) {
+                // Delete the PDF file from storage if it exists
+                if (payslip.getPdfPath() != null) {
+                    try {
+                        fileStorageService.deleteFile(payslip.getPdfPath());
+                    } catch (Exception e) {
+                        log.warn("Failed to delete old payslip file {}: {}", payslip.getPdfPath(), e.getMessage());
+                    }
+                }
+                payslipRepository.delete(payslip);
+            }
+            payslipRepository.flush();
+        }
+
         List<PayrollEntry> entries = payrollEntryRepository.findByPayrollRunId(payrollRunId);
 
         for (PayrollEntry entry : entries) {

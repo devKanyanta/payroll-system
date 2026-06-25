@@ -1,7 +1,8 @@
 import api from './api';
 
 export const authService = {
-  login: (credentials) => api.post('/auth/login', credentials),
+  login: ({ email, password, rememberMe }) =>
+    api.post('/auth/login', { email, password, rememberMe }),
   refresh: (refreshToken) => api.post('/auth/refresh', { refreshToken }),
   logout: (refreshToken) => api.post('/auth/logout', { refreshToken }),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),

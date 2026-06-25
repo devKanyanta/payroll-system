@@ -8,9 +8,12 @@ import com.payroll.exception.ResourceNotFoundException;
 import com.payroll.repository.ExpenseRepository;
 import com.payroll.repository.UserRepository;
 import com.payroll.service.AuditService;
+import com.payroll.service.EmailService;
 import com.payroll.service.ExpenseService;
 import com.payroll.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -23,12 +26,17 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ExpenseServiceImpl implements ExpenseService {
 
     private final ExpenseRepository expenseRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
     private final NotificationService notificationService;
+    private final EmailService emailService;
+
+    @Value("${app.admin-email}")
+    private String adminEmail;
 
     @Override
     public Page<Expense> getAllExpenses(LocalDate start, LocalDate end, ExpenseStatus status,
@@ -79,6 +87,18 @@ public class ExpenseServiceImpl implements ExpenseService {
 
         for (User admin : admins) {
             notificationService.createNotification(admin.getId(), title, message, "EXPENSE", link);
+        }
+
+        // Send email notification to admin
+        try {
+            emailService.sendSimpleMessage(
+                adminEmail,
+                title,
+                message + "\n\nPlease log in to the system to review and approve or reject this expense.\n\n" + link
+            );
+        } catch (Exception e) {
+            // Log but don't fail — in-app notification was already sent
+            log.warn("Failed to send admin email notification for expense: {}", e.getMessage());
         }
 
         return saved;

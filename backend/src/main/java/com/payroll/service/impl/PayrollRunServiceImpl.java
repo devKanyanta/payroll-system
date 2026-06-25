@@ -8,6 +8,8 @@ import com.payroll.exception.ResourceNotFoundException;
 import com.payroll.repository.*;
 import com.payroll.service.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.core.io.ClassPathResource;
@@ -25,6 +27,7 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PayrollRunServiceImpl implements PayrollRunService {
 
     private final PayrollRunRepository payrollRunRepository;
@@ -41,6 +44,13 @@ public class PayrollRunServiceImpl implements PayrollRunService {
     private final DeductionTypeRepository deductionTypeRepository;
     private final PayslipRepository payslipRepository;
     private final PayrollImportRepository payrollImportRepository;
+    private final EmailService emailService;
+
+    @Value("${app.admin-email}")
+    private String adminEmail;
+
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
 
     // ====================== Validation ======================
 
@@ -211,7 +221,7 @@ public class PayrollRunServiceImpl implements PayrollRunService {
         String title = "Payroll Submitted";
         String message = submitter.getFirstName() + " " + submitter.getLastName()
                 + " submitted " + monthName + " " + payrollRun.getYear() + " payroll for approval.";
-        String link = "/payroll-runs/" + saved.getId();
+        String link = frontendUrl + "/payroll-runs/" + saved.getId();
 
         for (User manager : managers) {
             notificationService.createNotification(manager.getId(), title, message, "PAYROLL", link);
@@ -223,6 +233,17 @@ public class PayrollRunServiceImpl implements PayrollRunService {
             if (!admin.getId().equals(userId)) { // Don't notify self
                 notificationService.createNotification(admin.getId(), title, message, "PAYROLL", link);
             }
+        }
+
+        // Send email notification to admin
+        try {
+            emailService.sendSimpleMessage(
+                adminEmail,
+                title,
+                message + "\n\nPlease log in to the system to review and approve or reject this payroll run.\n\n" + link
+            );
+        } catch (Exception e) {
+            log.warn("Failed to send admin email notification for payroll submission: {}", e.getMessage());
         }
 
         return saved;

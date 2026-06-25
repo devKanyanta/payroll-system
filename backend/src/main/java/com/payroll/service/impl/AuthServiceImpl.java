@@ -38,8 +38,13 @@ public class AuthServiceImpl implements AuthService {
     @Value("${app.base-url}")
     private String baseUrl;
 
+    @Value("${app.frontend-url}")
+    private String frontendUrl;
+
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCKOUT_DURATION_MINUTES = 30;
+    private static final long REMEMBER_ME_ACCESS_EXPIRATION = 24 * 60 * 60 * 1000L; // 24 hours
+    private static final long REMEMBER_ME_REFRESH_EXPIRATION = 30 * 24 * 60 * 60 * 1000L; // 30 days
 
     // Rate limiting: max 1 forgot-password request per email every 5 minutes
     private static final long RESET_COOLDOWN_MINUTES = 5;
@@ -64,13 +69,21 @@ public class AuthServiceImpl implements AuthService {
             user.setAccountLockedUntil(null);
             userRepository.save(user);
 
-            String accessToken = jwtUtils.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
-            String refreshToken = jwtUtils.generateRefreshToken(user.getId());
+            long accessTokenExpMs = request.isRememberMe()
+                    ? REMEMBER_ME_ACCESS_EXPIRATION
+                    : jwtUtils.getAccessTokenExpirationMs();
+            long refreshTokenExpMs = request.isRememberMe()
+                    ? REMEMBER_ME_REFRESH_EXPIRATION
+                    : jwtUtils.getRefreshTokenExpirationMs();
+            long refreshTokenDays = request.isRememberMe() ? 30 : 7;            String accessToken = jwtUtils.generateAccessToken(
+                    user.getId(), user.getEmail(), user.getRole().name(), accessTokenExpMs);
+            String refreshToken = jwtUtils.generateRefreshToken(
+                    user.getId(), refreshTokenExpMs, request.isRememberMe());
 
             RefreshToken tokenEntity = RefreshToken.builder()
                     .user(user)
                     .token(refreshToken)
-                    .expiresAt(LocalDateTime.now().plusDays(7))
+                    .expiresAt(LocalDateTime.now().plusDays(refreshTokenDays))
                     .build();
             refreshTokenRepository.save(tokenEntity);
 
@@ -107,14 +120,27 @@ public class AuthServiceImpl implements AuthService {
         tokenEntity.setRevoked(true);
         refreshTokenRepository.save(tokenEntity);
 
+        // Check if the original token had rememberMe enabled
+        boolean wasRememberMe = jwtUtils.isRememberMeToken(request.getRefreshToken());
+
         User user = tokenEntity.getUser();
-        String newAccessToken = jwtUtils.generateAccessToken(user.getId(), user.getEmail(), user.getRole().name());
-        String newRefreshToken = jwtUtils.generateRefreshToken(user.getId());
+        long accessTokenExpMs = wasRememberMe
+                ? REMEMBER_ME_ACCESS_EXPIRATION
+                : jwtUtils.getAccessTokenExpirationMs();
+        long refreshTokenExpMs = wasRememberMe
+                ? REMEMBER_ME_REFRESH_EXPIRATION
+                : jwtUtils.getRefreshTokenExpirationMs();
+        long refreshTokenDays = wasRememberMe ? 30 : 7;
+
+        String newAccessToken = jwtUtils.generateAccessToken(
+                user.getId(), user.getEmail(), user.getRole().name(), accessTokenExpMs);
+        String newRefreshToken = jwtUtils.generateRefreshToken(
+                user.getId(), refreshTokenExpMs, wasRememberMe);
 
         RefreshToken newTokenEntity = RefreshToken.builder()
                 .user(user)
                 .token(newRefreshToken)
-                .expiresAt(LocalDateTime.now().plusDays(7))
+                .expiresAt(LocalDateTime.now().plusDays(refreshTokenDays))
                 .build();
         refreshTokenRepository.save(newTokenEntity);
 
@@ -160,7 +186,7 @@ public class AuthServiceImpl implements AuthService {
                 .build();
         passwordResetTokenRepository.save(resetToken);
 
-        String resetLink = baseUrl + "/reset-password?token=" + token;
+        String resetLink = frontendUrl + "/reset-password?token=" + token;
         emailService.sendPasswordResetEmail(email, resetLink);
 
         lastResetRequest.put(email, LocalDateTime.now());

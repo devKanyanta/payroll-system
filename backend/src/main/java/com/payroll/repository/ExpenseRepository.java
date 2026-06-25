@@ -34,4 +34,6 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
            "EXTRACT(MONTH FROM e.expenseDate) = :month AND " +
            "EXTRACT(YEAR FROM e.expenseDate) = :year")
     BigDecimal sumExpensesByMonth(@Param("month") int month, @Param("year") int year);
+
+    boolean existsByCreatedById(UUID createdById);
 }

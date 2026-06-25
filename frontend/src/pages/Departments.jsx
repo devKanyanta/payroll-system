@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Box, Typography, Button, TextField, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Paper, IconButton, Card, CardContent,
-  Dialog, DialogTitle, DialogContent, DialogActions,
+  Dialog, DialogTitle, DialogContent, DialogActions, Snackbar, Alert,
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 import { departmentService } from '../services/departmentService';
@@ -15,6 +15,7 @@ export default function Departments() {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ name: '', description: '' });
   const [deleteId, setDeleteId] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
   const queryClient = useQueryClient();
 
   const { data: departments, isLoading } = useQuery({
@@ -25,16 +26,22 @@ export default function Departments() {
   const createMutation = useMutation({
     mutationFn: (data) => departmentService.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['departments'] }); closeDialog(); },
+    onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to create department', severity: 'error' }),
   });
 
   const updateMutation = useMutation({
     mutationFn: (data) => departmentService.update(editId, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['departments'] }); closeDialog(); },
+    onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to update department', severity: 'error' }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => departmentService.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['departments'] }); setDeleteId(null); },
+    onError: (err) => {
+      setDeleteId(null);
+      setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to delete department', severity: 'error' });
+    },
   });
 
   const openCreate = () => { setEditId(null); setForm({ name: '', description: '' }); setDialogOpen(true); };
@@ -115,6 +122,17 @@ export default function Departments() {
         message="Are you sure? This may affect employees in this department."
         onConfirm={() => deleteMutation.mutate(deleteId)} onCancel={() => setDeleteId(null)} color="error"
       />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar((p) => ({ ...p, open: false }))} severity={snackbar.severity} variant="filled">
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

@@ -61,6 +61,8 @@ app:
     api-key: ${RESEND_API_KEY:re_MA6LxTYU_FgRTU1U39N6dBtxpBL7mYznS}
     from-address: ${RESEND_FROM_ADDRESS:no-reply@mesltd.co.zm}
   base-url: ${APP_BASE_URL:https://api.mesltd.co.zm}
+  frontend-url: ${APP_FRONTEND_URL:https://payroll.mesltd.co.zm}
+  admin-email: ${ADMIN_EMAIL:kellieschikumbi98@gmail.com}
   payslip-storage: ${PAYSLIP_STORAGE:./payslips}
 
 springdoc:

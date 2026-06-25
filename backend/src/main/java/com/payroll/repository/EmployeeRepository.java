@@ -48,4 +48,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
 
     @Query("SELECT d.name AS department, COUNT(e) AS count FROM Employee e JOIN e.department d WHERE e.status = 'ACTIVE' GROUP BY d.name ORDER BY COUNT(e) DESC")
     List<Object[]> countActiveByDepartment();
+
+    boolean existsByDepartmentId(UUID departmentId);
 }

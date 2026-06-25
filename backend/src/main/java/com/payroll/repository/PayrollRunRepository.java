@@ -31,4 +31,6 @@ public interface PayrollRunRepository extends JpaRepository<PayrollRun, UUID> {
     List<PayrollRun> findByStatus(PayrollRunStatus status);
 
     boolean existsByMonthAndYear(Integer month, Integer year);
+
+    boolean existsByCreatedById(UUID createdById);
 }

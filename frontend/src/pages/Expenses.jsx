@@ -4,7 +4,7 @@ import {
   Box, Typography, Button, TextField, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Card, CardContent, Grid,
   TablePagination, IconButton, Dialog, DialogTitle, DialogContent,
-  DialogActions, Chip, Tooltip,  Stack,
+  DialogActions, Chip, Tooltip, Stack, Snackbar, Alert,
 } from '@mui/material';
 import {
   Add, Edit, Delete, CheckCircle, Cancel,
@@ -51,6 +51,7 @@ export default function Expenses() {
   const [form, setForm] = useState(emptyExpense);
   const [deleteId, setDeleteId] = useState(null);
   const [rejectDialog, setRejectDialog] = useState({ open: false, id: null, reason: '' });
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
   const queryClient = useQueryClient();
 
   // Get current user from localStorage
@@ -82,21 +83,31 @@ export default function Expenses() {
   const createMutation = useMutation({
     mutationFn: (data) => expenseService.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); closeDialog(); },
+    onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to create expense', severity: 'error' }),
   });
 
   const updateMutation = useMutation({
     mutationFn: (data) => expenseService.update(editId, data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); closeDialog(); },
+    onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to update expense', severity: 'error' }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => expenseService.delete(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); setDeleteId(null); },
+    onError: (err) => {
+      setDeleteId(null);
+      setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to delete expense', severity: 'error' });
+    },
   });
 
   const approveMutation = useMutation({
     mutationFn: (id) => expenseService.approve(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['expenses'] }); },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      setSnackbar({ open: true, message: 'Expense approved successfully', severity: 'success' });
+    },
+    onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to approve expense', severity: 'error' }),
   });
 
   const rejectMutation = useMutation({
@@ -104,7 +115,9 @@ export default function Expenses() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
       setRejectDialog({ open: false, id: null, reason: '' });
+      setSnackbar({ open: true, message: 'Expense rejected', severity: 'info' });
     },
+    onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to reject expense', severity: 'error' }),
   });
 
   const openCreate = () => { setEditId(null); setForm(emptyExpense); setDialogOpen(true); };
@@ -413,6 +426,17 @@ export default function Expenses() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar((p) => ({ ...p, open: false }))} severity={snackbar.severity} variant="filled">
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

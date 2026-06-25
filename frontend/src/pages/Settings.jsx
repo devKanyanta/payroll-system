@@ -4,7 +4,7 @@ import {
   Box, Typography, Button, TextField, Card, CardContent, Grid,
   Tabs, Tab, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, IconButton, Dialog, DialogTitle, DialogContent, DialogActions,
-  Alert,
+  Alert, Snackbar,
 } from '@mui/material';
 import { Add, Edit, Delete } from '@mui/icons-material';
 import { settingsService } from '../services/settingsService';
@@ -49,6 +49,7 @@ function PayrollSettingsForm() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(null);
   const [success, setSuccess] = useState('');
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
 
   const { data: settings, isLoading } = useQuery({
     queryKey: ['payroll-settings'],
@@ -72,6 +73,7 @@ function PayrollSettingsForm() {
       setSuccess('Settings updated successfully');
       setTimeout(() => setSuccess(''), 3000);
     },
+    onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to save settings', severity: 'error' }),
   });
 
   if (isLoading) return <LoadingScreen />;
@@ -115,6 +117,17 @@ function PayrollSettingsForm() {
         disabled={updateMutation.isPending}>
         Save Settings
       </Button>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar((p) => ({ ...p, open: false }))} severity={snackbar.severity} variant="filled">
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
@@ -124,6 +137,7 @@ function TaxBracketsPanel() {
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState({ minAmount: '', maxAmount: '', taxRate: '', effectiveDate: '' });
   const [deleteId, setDeleteId] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
   const queryClient = useQueryClient();
 
   const { data: brackets, isLoading } = useQuery({
@@ -134,11 +148,16 @@ function TaxBracketsPanel() {
   const createMutation = useMutation({
     mutationFn: (data) => settingsService.createTaxBracket(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tax-brackets'] }); setDialogOpen(false); setForm({ minAmount: '', maxAmount: '', taxRate: '', effectiveDate: '' }); },
+    onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to create tax bracket', severity: 'error' }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id) => settingsService.deleteTaxBracket(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['tax-brackets'] }); setDeleteId(null); },
+    onError: (err) => {
+      setDeleteId(null);
+      setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to delete tax bracket', severity: 'error' });
+    },
   });
 
   if (isLoading) return <LoadingScreen />;
@@ -217,6 +236,17 @@ function TaxBracketsPanel() {
       <ConfirmDialog open={!!deleteId} title="Delete Tax Bracket" color="error"
         message="Are you sure you want to delete this tax bracket?"
         onConfirm={() => deleteMutation.mutate(deleteId)} onCancel={() => setDeleteId(null)} />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar((p) => ({ ...p, open: false }))} severity={snackbar.severity} variant="filled">
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }

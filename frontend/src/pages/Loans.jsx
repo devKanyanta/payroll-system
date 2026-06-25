@@ -4,7 +4,7 @@ import {
   Box, Typography, Button, TextField, Select, MenuItem, FormControl,
   InputLabel, Table, TableBody, TableCell, TableContainer, TableHead,
   TableRow, Card, CardContent, Grid, Chip, IconButton, Tooltip, Stack,
-  Dialog, DialogTitle, DialogContent, DialogActions, alpha,
+  Dialog, DialogTitle, DialogContent, DialogActions, alpha, Snackbar, Alert,
 } from '@mui/material';
 import {
   Add, Cancel, Gavel, TrendingDown, CalendarMonth, Search,
@@ -51,6 +51,7 @@ export default function Loans() {
   const [cancelId, setCancelId] = useState(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
   const queryClient = useQueryClient();
 
   const { data: employees } = useQuery({
@@ -72,11 +73,16 @@ export default function Loans() {
   const createMutation = useMutation({
     mutationFn: (data) => loanService.create(data),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['loans'] }); closeDialog(); },
+    onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to create loan', severity: 'error' }),
   });
 
   const cancelMutation = useMutation({
     mutationFn: (id) => loanService.cancel(id),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['loans'] }); setCancelId(null); },
+    onError: (err) => {
+      setCancelId(null);
+      setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to cancel loan', severity: 'error' });
+    },
   });
 
   // ── Derived stats ──
@@ -532,6 +538,17 @@ export default function Loans() {
         color="error"
         confirmLabel="Cancel Loan"
       />
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar((p) => ({ ...p, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar((p) => ({ ...p, open: false }))} severity={snackbar.severity} variant="filled">
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
