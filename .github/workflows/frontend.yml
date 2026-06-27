@@ -16,6 +16,8 @@ jobs:
       run:
         working-directory: frontend
 
+      run: echo "${{ secrets.VPS_KEY }}" | wc -c
+
     steps:
 
       - uses: actions/checkout@v4
