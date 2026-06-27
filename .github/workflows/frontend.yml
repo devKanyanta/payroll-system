@@ -7,40 +7,36 @@ on:
       - frontend/**
 
 jobs:
-
   deploy:
-
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: frontend
-
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Debug SSH Key Length
-        run: echo "${{ secrets.VPS_KEY }}" | wc -c
-
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: 26
 
-      - run: npm ci
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
 
-      - run: npm run build
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
 
-      - name: Upload Dist
+      - name: Upload build to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ubuntu
           key: ${{ secrets.VPS_SSH_KEY }}
           source: "frontend/dist/*"
-          target: "/root/payroll-frontend"
+          target: "/home/ubuntu/payroll-frontend"
 
-      - name: Reload Frontend
+      - name: Reload PM2
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
