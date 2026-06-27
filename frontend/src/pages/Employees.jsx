@@ -52,7 +52,7 @@ export default function Employees() {
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 400);
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ACTIVE');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -110,6 +110,8 @@ export default function Employees() {
     setEditId(null);
     setForm(emptyEmployee);
     setErrors({});
+    const today = new Date().toISOString().split('T')[0];
+    setForm((prev) => ({ ...prev, dateHired: today }));
     try {
       const res = await employeeService.getNextNumber();
       setForm((prev) => ({ ...prev, employeeNumber: res.data }));

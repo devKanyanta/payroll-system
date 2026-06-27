@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://api.mesltd.co.zm'; // Default to localhost if not set
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 const api = axios.create({
   baseURL: `${BASE_URL}/api`,
@@ -81,6 +81,13 @@ api.interceptors.response.use(
       } finally {
         isRefreshing = false;
       }
+    }
+
+    // 403 Forbidden — session is invalid, force logout
+    if (error.response?.status === 403) {
+      localStorage.clear();
+      window.location.href = '/login';
+      return Promise.reject(error);
     }
 
     return Promise.reject(error);
