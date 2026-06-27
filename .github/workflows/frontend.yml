@@ -13,12 +13,13 @@ jobs:
     runs-on: ubuntu-latest
 
     defaults:
-      # run:
-      #   working-directory: frontend
-
-      run: echo "${{ secrets.VPS_KEY }}" | wc -c
+      run:
+        working-directory: frontend
 
     steps:
+
+      - name: Debug SSH Key Length
+        run: echo "${{ secrets.VPS_KEY }}" | wc -c
 
       - uses: actions/checkout@v4
 
