@@ -1,2 +1,2 @@
-- name: Debug SSH key length
+name: Debug SSH key length
   run: echo "${{ secrets.VPS_KEY }}" | wc -c
