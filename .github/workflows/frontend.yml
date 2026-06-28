@@ -33,8 +33,9 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "frontend/dist/."
+          source: "frontend/dist/*"
           target: "/root/payroll-system/dist"
+          strip_components: 2
 
       - name: Reload PM2
         uses: appleboy/ssh-action@v1.0.3
