@@ -36,6 +36,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "backend/target/*.jar"
           target: "/root"
+          strip_components: 2
 
       - name: Restart Backend
         uses: appleboy/ssh-action@v1
