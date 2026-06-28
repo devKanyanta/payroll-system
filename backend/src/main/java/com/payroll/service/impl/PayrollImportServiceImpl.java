@@ -112,9 +112,10 @@ public class PayrollImportServiceImpl implements PayrollImportService {
                 sheet = workbook.getSheetAt(0);
             }
 
+            // ── Step 1: Validate ALL rows first and collect detailed errors ──
+            List<String> validationErrors = new ArrayList<>();
+            List<RowData> validRows = new ArrayList<>();
             int totalRows = 0;
-            int successRows = 0;
-            int errorRows = 0;
 
             for (int i = 3; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
@@ -129,176 +130,210 @@ public class PayrollImportServiceImpl implements PayrollImportService {
                 }
 
                 totalRows++;
+                int excelRowNum = i + 1; // Convert to 1-based for display
 
-                try {
-                    Employee employee = null;
+                Employee employee = null;
+                if (employeeNumber != null && !employeeNumber.isEmpty()) {
+                    employee = employeeByNumber.get(employeeNumber);
+                }
+                if (employee == null && nrc != null && !nrc.isEmpty()) {
+                    employee = employeeByNrc.get(nrc);
+                }
+                if (employee == null && names != null) {
+                    employee = employeeByName.get(names.toLowerCase());
+                }
+
+                if (employee == null) {
+                    StringBuilder identifier = new StringBuilder();
                     if (employeeNumber != null && !employeeNumber.isEmpty()) {
-                        employee = employeeByNumber.get(employeeNumber);
+                        identifier.append("Employee #").append(employeeNumber);
                     }
-                    if (employee == null && nrc != null && !nrc.isEmpty()) {
-                        employee = employeeByNrc.get(nrc);
+                    if (nrc != null && !nrc.isEmpty()) {
+                        if (!identifier.isEmpty()) identifier.append(", ");
+                        identifier.append("NRC: ").append(nrc);
                     }
-                    if (employee == null && names != null) {
-                        employee = employeeByName.get(names.toLowerCase());
+                    if (names != null && !names.isEmpty()) {
+                        if (!identifier.isEmpty()) identifier.append(", ");
+                        identifier.append("Name: ").append(names);
                     }
-                    if (employee == null) {
-                        errorRows++;
-                        continue;
-                    }
+                    validationErrors.add(String.format(
+                            "Row %d: Employee not found in the system (%s)",
+                            excelRowNum, identifier));
+                    continue;
+                }
 
-                    if (payrollEntryRepository.findByPayrollRunIdAndEmployeeId(payrollRun.getId(), employee.getId()).isPresent()) {
-                        errorRows++;
-                        continue;
-                    }
+                if (payrollEntryRepository.findByPayrollRunIdAndEmployeeId(payrollRun.getId(), employee.getId()).isPresent()) {
+                    validationErrors.add(String.format(
+                            "Row %d: Employee '%s %s' (#%s) already has an entry in this payroll run",
+                            excelRowNum, employee.getFirstName(), employee.getLastName(), employee.getEmployeeNumber()));
+                    continue;
+                }
 
-                    // Update employee details from new template columns
-                    String phone = getCellStringValue(row.getCell(6));      // PHONE NUMBER
-                    String email = getCellStringValue(row.getCell(7));      // EMAIL
-                    String accountNumber = getCellStringValue(row.getCell(8)); // ACCOUNT NUMBER
-                    String sortCode = getCellStringValue(row.getCell(9));   // SORT CODE
-                    String site = getCellStringValue(row.getCell(5));       // SITE
+                validRows.add(new RowData(row, employee));
+            }
 
-                    boolean employeeUpdated = false;
-                    if (phone != null && !phone.isEmpty() && !phone.equals(employee.getPhone())) {
-                        employee.setPhone(phone);
-                        employeeUpdated = true;
-                    }
-                    if (email != null && !email.isEmpty() && !email.equals(employee.getEmail())) {
-                        employee.setEmail(email);
-                        employeeUpdated = true;
-                    }
-                    if (accountNumber != null && !accountNumber.isEmpty() && !accountNumber.equals(employee.getAccountNumber())) {
-                        employee.setAccountNumber(accountNumber);
-                        employeeUpdated = true;
-                    }
-                    if (sortCode != null && !sortCode.isEmpty() && !sortCode.equals(employee.getSortCode())) {
-                        employee.setSortCode(sortCode);
-                        employeeUpdated = true;
-                    }
-                    if (site != null && !site.isEmpty() && !site.equals(employee.getSite())) {
-                        employee.setSite(site);
-                        employeeUpdated = true;
-                    }
-                    if (employeeUpdated) {
-                        employeeRepository.save(employee);
-                    }
+            // ── Step 2: If validation errors exist, reject entirely ──
+            if (!validationErrors.isEmpty()) {
+                payrollImport.setTotalRows(totalRows);
+                payrollImport.setSuccessRows(0);
+                payrollImport.setErrorRows(validationErrors.size());
+                payrollImport.setErrorDetails(String.join("\n", validationErrors));
+                payrollImport.setStatus(ImportStatus.FAILED);
+                return payrollImportRepository.save(payrollImport);
+            }
 
-                    // ── Read ALL imported values from the Excel file ──
-                    BigDecimal presentDays = getNumericCellValue(row.getCell(14));    // PRESENT DAYS (col O)
-                    BigDecimal presentAmount = getNumericCellValue(row.getCell(15));  // PRESENT AMOUNT (col P)
-                    BigDecimal overtimeHrs = getNumericCellValue(row.getCell(16));    // OVERT TIME (col Q)
-                    BigDecimal overtimeAmt = getNumericCellValue(row.getCell(17));   // OVER TIME AMOUNT (col R)
-                    BigDecimal holidayHrs = getNumericCellValue(row.getCell(18));     // HOLIDAY OVER TIME (col S)
-                    BigDecimal holidayAmt = getNumericCellValue(row.getCell(19));    // HOLIDAY OVER TIME AMOUNT (col T)
-                    BigDecimal grossSalary = getNumericCellValue(row.getCell(20));   // GROSS SALARY (col U)
-                    BigDecimal nhima = getNumericCellValue(row.getCell(21));          // NHIMA (col V)
-                    BigDecimal napsa = getNumericCellValue(row.getCell(22));          // NAPSA (col W)
-                    BigDecimal importedLoanBalance = getNumericCellValue(row.getCell(23)); // SOFT LOAN (col X)
-                    BigDecimal loanDeduction = getNumericCellValue(row.getCell(24));  // SOFT LOAN DEDUCTION (col Y)
-                    BigDecimal otherDeduction = getNumericCellValue(row.getCell(25)); // OTHER DEDUCTION (col Z)
-                    BigDecimal netSalary = getNumericCellValue(row.getCell(26));      // NET PAY (col AA)
+            // ── Step 3: No errors — proceed with import ──
+            int successRows = 0;
 
-                    // Calculate derived fields for record-keeping
-                    BigDecimal hourlyRate = employee.getRate() != null ? employee.getRate() : BigDecimal.ZERO;
-                    BigDecimal normalHrsPerDay = BigDecimal.valueOf(settings.getHoursPerDay());
-                    BigDecimal regularHours = normalHrsPerDay.multiply(presentDays);
-                    BigDecimal monthlyEquivalent = hourlyRate.multiply(
-                            BigDecimal.valueOf(settings.getHoursPerDay() * settings.getWorkingDaysPerMonth()));
+            for (RowData rowData : validRows) {
+                Row row = rowData.row;
+                Employee employee = rowData.employee;
 
-                    // Build PayrollEntry directly from imported values
-                    PayrollEntry entry = PayrollEntry.builder()
-                            .basicSalary(monthlyEquivalent)
-                            .hourlyRate(hourlyRate)
-                            .presentDays(presentDays)
-                            .loanBalance(importedLoanBalance)
-                            .site(employee.getSite())
-                            .regularHours(regularHours)
-                            .regularAmount(presentAmount)
-                            .overtimeHours(overtimeHrs)
-                            .overtimeAmount(overtimeAmt)
-                            .holidayHours(holidayHrs)
-                            .holidayAmount(holidayAmt)
-                            .grossSalary(grossSalary)
-                            .nhima(nhima)
-                            .napsa(napsa)
-                            .paye(BigDecimal.ZERO)
-                            .loanDeduction(loanDeduction)
-                            .otherDeductions(otherDeduction)
-                            .netSalary(netSalary)
-                            .build();
-                    entry.setPayrollRun(payrollRun);
-                    entry.setEmployee(employee);
+                // Update employee details from new template columns
+                String phone = getCellStringValue(row.getCell(6));      // PHONE NUMBER
+                String email = getCellStringValue(row.getCell(7));      // EMAIL
+                String accountNumber = getCellStringValue(row.getCell(8)); // ACCOUNT NUMBER
+                String sortCode = getCellStringValue(row.getCell(9));   // SORT CODE
+                String site = getCellStringValue(row.getCell(5));       // SITE
 
-                    payrollEntryRepository.save(entry);
+                boolean employeeUpdated = false;
+                if (phone != null && !phone.isEmpty() && !phone.equals(employee.getPhone())) {
+                    employee.setPhone(phone);
+                    employeeUpdated = true;
+                }
+                if (email != null && !email.isEmpty() && !email.equals(employee.getEmail())) {
+                    employee.setEmail(email);
+                    employeeUpdated = true;
+                }
+                if (accountNumber != null && !accountNumber.isEmpty() && !accountNumber.equals(employee.getAccountNumber())) {
+                    employee.setAccountNumber(accountNumber);
+                    employeeUpdated = true;
+                }
+                if (sortCode != null && !sortCode.isEmpty() && !sortCode.equals(employee.getSortCode())) {
+                    employee.setSortCode(sortCode);
+                    employeeUpdated = true;
+                }
+                if (site != null && !site.isEmpty() && !site.equals(employee.getSite())) {
+                    employee.setSite(site);
+                    employeeUpdated = true;
+                }
+                if (employeeUpdated) {
+                    employeeRepository.save(employee);
+                }
 
-                    // ── Update loan balances from imported deductions ──
-                    if (loanDeduction.compareTo(BigDecimal.ZERO) > 0) {
-                        List<Loan> activeLoans = loanRepository.findByEmployeeIdAndStatus(
-                                employee.getId(), LoanStatus.ACTIVE);
+                // ── Read ALL imported values from the Excel file ──
+                BigDecimal presentDays = getNumericCellValue(row.getCell(14));    // PRESENT DAYS (col O)
+                BigDecimal presentAmount = getNumericCellValue(row.getCell(15));  // PRESENT AMOUNT (col P)
+                BigDecimal overtimeHrs = getNumericCellValue(row.getCell(16));    // OVERT TIME (col Q)
+                BigDecimal overtimeAmt = getNumericCellValue(row.getCell(17));   // OVER TIME AMOUNT (col R)
+                BigDecimal holidayHrs = getNumericCellValue(row.getCell(18));     // HOLIDAY OVER TIME (col S)
+                BigDecimal holidayAmt = getNumericCellValue(row.getCell(19));    // HOLIDAY OVER TIME AMOUNT (col T)
+                BigDecimal grossSalary = getNumericCellValue(row.getCell(20));   // GROSS SALARY (col U)
+                BigDecimal nhima = getNumericCellValue(row.getCell(21));          // NHIMA (col V)
+                BigDecimal napsa = getNumericCellValue(row.getCell(22));          // NAPSA (col W)
+                BigDecimal importedLoanBalance = getNumericCellValue(row.getCell(23)); // SOFT LOAN (col X)
+                BigDecimal loanDeduction = getNumericCellValue(row.getCell(24));  // SOFT LOAN DEDUCTION (col Y)
+                BigDecimal otherDeduction = getNumericCellValue(row.getCell(25)); // OTHER DEDUCTION (col Z)
+                BigDecimal netSalary = getNumericCellValue(row.getCell(26));      // NET PAY (col AA)
 
-                        if (!activeLoans.isEmpty()) {
-                            // Deduct from existing active loans
-                            BigDecimal remainingDeduction = loanDeduction;
-                            for (Loan loan : activeLoans) {
-                                if (remainingDeduction.compareTo(BigDecimal.ZERO) <= 0) break;
+                // Calculate derived fields for record-keeping
+                BigDecimal hourlyRate = employee.getRate() != null ? employee.getRate() : BigDecimal.ZERO;
+                BigDecimal normalHrsPerDay = BigDecimal.valueOf(settings.getHoursPerDay());
+                BigDecimal regularHours = normalHrsPerDay.multiply(presentDays);
+                BigDecimal monthlyEquivalent = hourlyRate.multiply(
+                        BigDecimal.valueOf(settings.getHoursPerDay() * settings.getWorkingDaysPerMonth()));
 
-                                BigDecimal actualDeduction = remainingDeduction.min(loan.getBalance());
-                                BigDecimal newBalance = loan.getBalance().subtract(actualDeduction)
-                                        .max(BigDecimal.ZERO);
+                // Build PayrollEntry directly from imported values
+                PayrollEntry entry = PayrollEntry.builder()
+                        .basicSalary(monthlyEquivalent)
+                        .hourlyRate(hourlyRate)
+                        .presentDays(presentDays)
+                        .loanBalance(importedLoanBalance)
+                        .site(employee.getSite())
+                        .regularHours(regularHours)
+                        .regularAmount(presentAmount)
+                        .overtimeHours(overtimeHrs)
+                        .overtimeAmount(overtimeAmt)
+                        .holidayHours(holidayHrs)
+                        .holidayAmount(holidayAmt)
+                        .grossSalary(grossSalary)
+                        .nhima(nhima)
+                        .napsa(napsa)
+                        .paye(BigDecimal.ZERO)
+                        .loanDeduction(loanDeduction)
+                        .otherDeductions(otherDeduction)
+                        .netSalary(netSalary)
+                        .build();
+                entry.setPayrollRun(payrollRun);
+                entry.setEmployee(employee);
 
-                                loan.setBalance(newBalance);
-                                if (newBalance.compareTo(BigDecimal.ZERO) <= 0) {
-                                    loan.setStatus(LoanStatus.COMPLETED);
-                                }
+                payrollEntryRepository.save(entry);
 
-                                loanRepository.save(loan);
-                                remainingDeduction = remainingDeduction.subtract(actualDeduction);
+                // ── Update loan balances from imported deductions ──
+                if (loanDeduction.compareTo(BigDecimal.ZERO) > 0) {
+                    List<Loan> activeLoans = loanRepository.findByEmployeeIdAndStatus(
+                            employee.getId(), LoanStatus.ACTIVE);
+
+                    if (!activeLoans.isEmpty()) {
+                        // Deduct from existing active loans
+                        BigDecimal remainingDeduction = loanDeduction;
+                        for (Loan loan : activeLoans) {
+                            if (remainingDeduction.compareTo(BigDecimal.ZERO) <= 0) break;
+
+                            BigDecimal actualDeduction = remainingDeduction.min(loan.getBalance());
+                            BigDecimal newBalance = loan.getBalance().subtract(actualDeduction)
+                                    .max(BigDecimal.ZERO);
+
+                            loan.setBalance(newBalance);
+                            if (newBalance.compareTo(BigDecimal.ZERO) <= 0) {
+                                loan.setStatus(LoanStatus.COMPLETED);
                             }
 
-                            auditService.logEvent(userId, "LOAN_DEDUCTION", "Loan",
-                                    employee.getId().toString(),
-                                    null,
-                                    String.format("Imported payroll deducted ZMW %.2f from employee %s %s's loans",
-                                            loanDeduction, employee.getFirstName(), employee.getLastName()),
-                                    null);
-                        } else {
-                            // No active loan exists — create a historical record marked as paid.
-                            BigDecimal loanBalance = (importedLoanBalance != null
-                                    && importedLoanBalance.compareTo(BigDecimal.ZERO) > 0)
-                                    ? importedLoanBalance : loanDeduction;
-
-                            Loan newLoan = Loan.builder()
-                                    .employee(employee)
-                                    .loanAmount(loanBalance)
-                                    .balance(BigDecimal.ZERO)
-                                    .interestRate(BigDecimal.ZERO)
-                                    .monthlyDeduction(loanDeduction)
-                                    .durationMonths(1)
-                                    .startDate(LocalDate.now())
-                                    .endDate(LocalDate.now())
-                                    .status(LoanStatus.COMPLETED)
-                                    .build();
-                            loanRepository.save(newLoan);
-
-                            auditService.logEvent(userId, "LOAN_CREATED", "Loan",
-                                    employee.getId().toString(),
-                                    null,
-                                    String.format("Loan created from payroll import: ZMW %.2f for employee %s %s",
-                                            loanBalance, employee.getFirstName(), employee.getLastName()),
-                                    null);
+                            loanRepository.save(loan);
+                            remainingDeduction = remainingDeduction.subtract(actualDeduction);
                         }
+
+                        auditService.logEvent(userId, "LOAN_DEDUCTION", "Loan",
+                                employee.getId().toString(),
+                                null,
+                                String.format("Imported payroll deducted ZMW %.2f from employee %s %s's loans",
+                                        loanDeduction, employee.getFirstName(), employee.getLastName()),
+                                null);
+                    } else {
+                        // No active loan exists — create a historical record marked as paid.
+                        BigDecimal loanBalance = (importedLoanBalance != null
+                                && importedLoanBalance.compareTo(BigDecimal.ZERO) > 0)
+                                ? importedLoanBalance : loanDeduction;
+
+                        Loan newLoan = Loan.builder()
+                                .employee(employee)
+                                .loanAmount(loanBalance)
+                                .balance(BigDecimal.ZERO)
+                                .interestRate(BigDecimal.ZERO)
+                                .monthlyDeduction(loanDeduction)
+                                .durationMonths(1)
+                                .startDate(LocalDate.now())
+                                .endDate(LocalDate.now())
+                                .status(LoanStatus.COMPLETED)
+                                .build();
+                        loanRepository.save(newLoan);
+
+                        auditService.logEvent(userId, "LOAN_CREATED", "Loan",
+                                employee.getId().toString(),
+                                null,
+                                String.format("Loan created from payroll import: ZMW %.2f for employee %s %s",
+                                        loanBalance, employee.getFirstName(), employee.getLastName()),
+                                null);
                     }
-
-                    successRows++;
-
-                } catch (Exception e) {
-                    errorRows++;
                 }
+
+                successRows++;
             }
 
             payrollImport.setTotalRows(totalRows);
             payrollImport.setSuccessRows(successRows);
-            payrollImport.setErrorRows(errorRows);
+            payrollImport.setErrorRows(0);
+            payrollImport.setErrorDetails(null);
             payrollImport.setStatus(ImportStatus.IMPORTED);
 
         } catch (Exception e) {
@@ -417,6 +452,11 @@ public class PayrollImportServiceImpl implements PayrollImportService {
             default -> null;
         };
     }
+
+    /**
+     * Holds a parsed row and its matched employee during validation.
+     */
+    private record RowData(Row row, Employee employee) {}
 
     private BigDecimal getNumericCellValue(Cell cell) {
         if (cell == null) return BigDecimal.ZERO;

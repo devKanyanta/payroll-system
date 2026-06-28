@@ -4,10 +4,11 @@ import {
   Box, Typography, Button, Card, CardContent, Alert, Stack, alpha,
   Stepper, Step, StepLabel, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Select, MenuItem,
-  FormControl, InputLabel, LinearProgress, Chip,
+  FormControl, InputLabel, LinearProgress, Chip, Paper,
 } from '@mui/material';
 import {
   CloudUpload, CheckCircle, PlayArrow, Download, Description, UploadFile,
+  Cancel, WarningAmber,
 } from '@mui/icons-material';
 import { payrollRunService } from '../services/payrollRunService';
 import apiService from '../services/api';
@@ -306,38 +307,137 @@ export default function PayrollImport() {
           {/* ── Step 3: Import Results ── */}
           {activeStep === 3 && processingResult && (
             <Box sx={{ py: 2 }}>
-              <Alert
-                severity={processingResult.errorRows > 0 ? 'warning' : 'success'}
-                sx={{ mb: 3 }}
-              >
+              {processingResult.status === 'FAILED' || processingResult.errorRows > 0 ? (
+                /* ── Import failed with errors ── */
                 <Box>
-                  <Typography variant="body2" fontWeight={600}>
-                    {processingResult.totalRows} rows processed
-                  </Typography>
-                  <Stack direction="row" spacing={1.5} sx={{ mt: 0.5 }} flexWrap="wrap">
-                    <Chip
-                      label={`${processingResult.successRows} imported`}
-                      size="small"
-                      sx={{ color: '#059669', bgcolor: '#d1fae5', fontWeight: 600, fontSize: '0.75rem' }}
-                    />
-                    {processingResult.errorRows > 0 && (
-                      <Chip
-                        label={`${processingResult.errorRows} with errors`}
-                        size="small"
-                        sx={{ color: '#dc2626', bgcolor: '#fee2e2', fontWeight: 600, fontSize: '0.75rem' }}
-                      />
-                    )}
+                  <Alert
+                    severity="error"
+                    icon={<Cancel />}
+                    sx={{ mb: 3 }}
+                  >
+                    <Box>
+                      <Typography variant="body1" fontWeight={700} sx={{ mb: 0.5 }}>
+                        Import Rejected — {processingResult.errorRows} error{processingResult.errorRows !== 1 ? 's' : ''} found
+                      </Typography>
+                      <Typography variant="body2" color="error.dark">
+                        The import has been rejected because some rows contain errors.
+                        Please fix the errors listed below and try again.
+                      </Typography>
+                      <Stack direction="row" spacing={1.5} sx={{ mt: 1.5 }} flexWrap="wrap">
+                        <Chip
+                          label={`${processingResult.totalRows} total rows`}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontWeight: 600, fontSize: '0.75rem' }}
+                        />
+                        <Chip
+                          label={`${processingResult.errorRows} error${processingResult.errorRows !== 1 ? 's' : ''}`}
+                          size="small"
+                          sx={{ color: '#dc2626', bgcolor: '#fee2e2', fontWeight: 600, fontSize: '0.75rem' }}
+                        />
+                      </Stack>
+                    </Box>
+                  </Alert>
+
+                  {processingResult.errorDetails && (
+                    <Paper
+                      variant="outlined"
+                      sx={{
+                        borderColor: alpha('#dc2626', 0.3),
+                        bgcolor: alpha('#dc2626', 0.03),
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                        mb: 3,
+                      }}
+                    >
+                      <Box sx={{
+                        px: 2.5, py: 1.5,
+                        borderBottom: '1px solid',
+                        borderColor: alpha('#dc2626', 0.15),
+                        display: 'flex', alignItems: 'center', gap: 1,
+                      }}>
+                        <WarningAmber sx={{ fontSize: 18, color: '#dc2626' }} />
+                        <Typography variant="subtitle2" fontWeight={700} color="error.dark">
+                          Error Details
+                        </Typography>
+                      </Box>
+                      <Box sx={{ px: 2.5, py: 1.5 }}>
+                        {processingResult.errorDetails.split('\n').map((errorLine, idx) => (
+                          <Box
+                            key={idx}
+                            sx={{
+                              display: 'flex',
+                              gap: 1.5,
+                              py: 1,
+                              borderBottom: idx < processingResult.errorDetails.split('\n').length - 1
+                                ? `1px solid ${alpha('#dc2626', 0.08)}`
+                                : 'none',
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: '#dc2626',
+                                fontWeight: 800,
+                                minWidth: 24,
+                                pt: 0.3,
+                                fontFamily: 'monospace',
+                              }}
+                            >
+                              {idx + 1}.
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{ color: '#7f1d1d', lineHeight: 1.5 }}
+                            >
+                              {errorLine}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Paper>
+                  )}
+
+                  <Stack direction="row" spacing={2} justifyContent="flex-end">
+                    <Button onClick={() => setActiveStep(1)} variant="outlined">
+                      Upload Different File
+                    </Button>
+                    <Button onClick={reset} variant="contained" color="error" sx={{ px: 3 }}>
+                      Start Over
+                    </Button>
                   </Stack>
                 </Box>
-              </Alert>
+              ) : (
+                /* ── Import succeeded ── */
+                <Box>
+                  <Alert
+                    severity="success"
+                    icon={<CheckCircle fontSize="small" />}
+                    sx={{ mb: 3 }}
+                  >
+                    <Box>
+                      <Typography variant="body2" fontWeight={600}>
+                        {processingResult.totalRows} rows processed successfully
+                      </Typography>
+                      <Stack direction="row" spacing={1.5} sx={{ mt: 0.5 }} flexWrap="wrap">
+                        <Chip
+                          label={`${processingResult.successRows} imported`}
+                          size="small"
+                          sx={{ color: '#059669', bgcolor: '#d1fae5', fontWeight: 600, fontSize: '0.75rem' }}
+                        />
+                      </Stack>
+                    </Box>
+                  </Alert>
 
-              <Stack direction="row" spacing={2} justifyContent="flex-end">
-                <Button onClick={reset} variant="outlined">Import Another File</Button>
-                <Button variant="contained" color="success" startIcon={<CheckCircle />}
-                  onClick={() => setActiveStep(4)} sx={{ px: 3 }}>
-                  Complete
-                </Button>
-              </Stack>
+                  <Stack direction="row" spacing={2} justifyContent="flex-end">
+                    <Button onClick={reset} variant="outlined">Import Another File</Button>
+                    <Button variant="contained" color="success" startIcon={<CheckCircle />}
+                      onClick={() => setActiveStep(4)} sx={{ px: 3 }}>
+                      Complete
+                    </Button>
+                  </Stack>
+                </Box>
+              )}
             </Box>
           )}
 

@@ -35,7 +35,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "frontend/dist/*"
           target: "/root/payroll-system"
-          strip_components: 2 # Strips 'frontend/dist' so only the contents go into /root/payroll-system
 
       - name: Reload PM2
         uses: appleboy/ssh-action@v1.0.3
