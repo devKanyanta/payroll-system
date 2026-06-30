@@ -7,7 +7,7 @@ import {
   DialogActions, Chip, Tooltip, Stack, Snackbar, Alert,
 } from '@mui/material';
 import {
-  Add, Edit, Delete, CheckCircle, Cancel,
+  Add, Edit, Delete, CheckCircle, Cancel, FileDownload,
 } from '@mui/icons-material';
 import { expenseService } from '../services/expenseService';
 import LoadingScreen from '../components/LoadingScreen';
@@ -158,9 +158,18 @@ export default function Expenses() {
             {isAdmin ? 'Review and approve expense requests' : 'Submit expenses for admin approval'}
           </Typography>
         </Box>
-        <Button variant="contained" startIcon={<Add />} onClick={openCreate}>
-          Add Expense
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<FileDownload />}
+            onClick={() => expenseService.exportApprovedExcel()}
+          >
+            Export Approved
+          </Button>
+          <Button variant="contained" startIcon={<Add />} onClick={openCreate}>
+            Add Expense
+          </Button>
+        </Box>
       </Box>
 
       {/* Filters */}

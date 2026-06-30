@@ -1,4 +1,5 @@
 import api from './api';
+import { downloadBlob } from './downloadUtils';
 
 export const expenseService = {
   getAll: (params) => api.get('/expenses', { params }),
@@ -8,4 +9,10 @@ export const expenseService = {
   delete: (id) => api.delete(`/expenses/${id}`),
   approve: (id) => api.put(`/expenses/${id}/approve`),
   reject: (id, reason) => api.put(`/expenses/${id}/reject`, { reason }),
+  exportApprovedExcel: async () => {
+    const res = await api.get('/expenses/export/approved-excel', {
+      responseType: 'blob',
+    });
+    downloadBlob(res.data, 'approved-expenses.xlsx');
+  },
 };
