@@ -18,7 +18,7 @@ import {
   Assessment as ReportsIcon,
   History as AuditIcon,
   ChevronLeft, ChevronRight, ExpandLess, ExpandMore,
-  AttachMoney,
+  AttachMoney, HealthAndSafety,
 } from '@mui/icons-material';
 
 const menuItems = [
@@ -38,6 +38,13 @@ const menuItems = [
       { text: 'Payroll Runs', icon: <PayrollIcon />, path: '/payroll-runs' },
       { text: 'Payroll Import', icon: <ImportIcon />, path: '/payroll-import' },
       { text: 'Payslips', icon: <PayslipIcon />, path: '/payslips' },
+    ],
+  },
+  {
+    text: 'PPE', icon: <HealthAndSafety />,
+    children: [
+      { text: 'PPE Requests', icon: <HealthAndSafety />, path: '/ppe' },
+      { text: 'PPE Catalog', icon: <HealthAndSafety />, path: '/ppe-catalog' },
     ],
   },
   { text: 'Expenses', icon: <ExpenseIcon />, path: '/expenses' },

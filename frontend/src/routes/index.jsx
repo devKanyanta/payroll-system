@@ -21,6 +21,10 @@ import Settings from '../pages/Settings';
 import Users from '../pages/Users';
 import Reports from '../pages/Reports';
 import AuditLogs from '../pages/AuditLogs';
+import PpeRequests from '../pages/PpeRequests';
+import PpeRequestForm from '../pages/PpeRequestForm';
+import PpeRequestDetail from '../pages/PpeRequestDetail';
+import PpeCatalog from '../pages/PpeCatalog';
 
 export default function AppRoutes() {
   return (
@@ -69,6 +73,33 @@ export default function AppRoutes() {
         <Route path="/audit-logs" element={
           <ProtectedRoute roles={['ADMIN']}>
             <AuditLogs />
+          </ProtectedRoute>
+        } />
+
+        {/* PPE Routes */}
+        <Route path="/ppe" element={
+          <ProtectedRoute roles={['ADMIN', 'HR']}>
+            <PpeRequests />
+          </ProtectedRoute>
+        } />
+        <Route path="/ppe/new" element={
+          <ProtectedRoute roles={['ADMIN', 'HR']}>
+            <PpeRequestForm />
+          </ProtectedRoute>
+        } />
+        <Route path="/ppe/:id" element={
+          <ProtectedRoute roles={['ADMIN', 'HR']}>
+            <PpeRequestDetail />
+          </ProtectedRoute>
+        } />
+        <Route path="/ppe/:id/edit" element={
+          <ProtectedRoute roles={['ADMIN', 'HR']}>
+            <PpeRequestForm />
+          </ProtectedRoute>
+        } />
+        <Route path="/ppe-catalog" element={
+          <ProtectedRoute roles={['ADMIN', 'HR']}>
+            <PpeCatalog />
           </ProtectedRoute>
         } />
       </Route>

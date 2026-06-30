@@ -56,6 +56,18 @@ public class SecurityConfig {
                 .requestMatchers("/api/reports/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR", "ROLE_MANAGER")
                 .requestMatchers("/api/notifications/**").authenticated()
                 .requestMatchers("/api/dashboard/**").authenticated()
+                // PPE Catalog — Admin + HR
+                .requestMatchers("/api/ppe-catalog/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR")
+                // PPE Requests — Admin + HR can read
+                .requestMatchers(HttpMethod.GET, "/api/ppe-requests/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR")
+                // PPE Requests — Admin-only approve/reject (must come before general PUT)
+                .requestMatchers(HttpMethod.PUT, "/api/ppe-requests/*/approve").hasAuthority("ROLE_ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/ppe-requests/*/reject").hasAuthority("ROLE_ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/ppe-requests/pending/**").hasAuthority("ROLE_ADMIN")
+                // PPE Requests — HR-only create/edit/delete
+                .requestMatchers(HttpMethod.POST, "/api/ppe-requests/**").hasAuthority("ROLE_HR")
+                .requestMatchers(HttpMethod.PUT, "/api/ppe-requests/**").hasAuthority("ROLE_HR")
+                .requestMatchers(HttpMethod.DELETE, "/api/ppe-requests/**").hasAuthority("ROLE_HR")
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session

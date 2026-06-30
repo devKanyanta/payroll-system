@@ -3,12 +3,13 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Box, Typography, Card, CardContent, Grid, Chip, Button,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Divider, Paper,
+  Divider, Paper, Stack, alpha,
 } from '@mui/material';
-import { ArrowBack, AccountBalance, Badge, CalendarMonth, Email, Phone, LocationOn } from '@mui/icons-material';
+import { ArrowBack, AccountBalance, Badge, CalendarMonth, Email, Phone, LocationOn, HealthAndSafety } from '@mui/icons-material';
 import { employeeService } from '../services/employeeService';
 import { loanService } from '../services/loanService';
 import { reportService } from '../services/reportService';
+import { ppeRequestService } from '../services/ppeRequestService';
 import LoadingScreen from '../components/LoadingScreen';
 import dayjs from 'dayjs';
 
@@ -32,6 +33,12 @@ export default function EmployeeDetails() {
   const { data: payrollHistory = [] } = useQuery({
     queryKey: ['employee-history', id],
     queryFn: async () => { const res = await reportService.getEmployeeHistory(id); return res.data; },
+    enabled: !!id,
+  });
+
+  const { data: ppeHistory = [] } = useQuery({
+    queryKey: ['ppe-history', id],
+    queryFn: async () => { const res = await ppeRequestService.getAll(id); return res.data; },
     enabled: !!id,
   });
 
@@ -266,6 +273,84 @@ export default function EmployeeDetails() {
                               color={loan.status === 'ACTIVE' ? 'primary'
                                 : loan.status === 'COMPLETED' ? 'success'
                                 : 'default'} />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* PPE History Card */}
+        <Grid item xs={12}>
+          <Card>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" fontWeight={700}>
+                  <HealthAndSafety sx={{ mr: 0.5, verticalAlign: 'middle', fontSize: 22 }} />
+                  PPE Allocation History ({ppeHistory.length})
+                </Typography>
+                <Button size="small" variant="contained" startIcon={<HealthAndSafety />}
+                  onClick={() => navigate(`/ppe/new?employeeId=${id}`)}>
+                  Request PPE
+                </Button>
+              </Box>
+              {ppeHistory.length === 0 ? (
+                <Paper sx={{ p: 4, textAlign: 'center', bgcolor: 'grey.50' }}>
+                  <HealthAndSafety sx={{ fontSize: 48, color: 'text.disabled', mb: 1 }} />
+                  <Typography color="text.secondary">No PPE allocation history</Typography>
+                  <Typography variant="caption" color="text.disabled">
+                    Click "Request PPE" to create a new allocation request
+                  </Typography>
+                </Paper>
+              ) : (
+                <TableContainer>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell><strong>Items</strong></TableCell>
+                        <TableCell><strong>Date Given</strong></TableCell>
+                        <TableCell><strong>Due Date</strong></TableCell>
+                        <TableCell><strong>Status</strong></TableCell>
+                        <TableCell><strong>Approved By</strong></TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {ppeHistory.map((req) => (
+                        <TableRow
+                          key={req.id}
+                          hover
+                          onClick={() => navigate(`/ppe/${req.id}`)}
+                          sx={{ cursor: 'pointer' }}
+                        >
+                          <TableCell>
+                            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                              {req.items?.map((item) => (
+                                <Chip key={item.id} label={item.name} size="small"
+                                  variant="outlined" sx={{ fontSize: '0.7rem' }} />
+                              ))}
+                            </Stack>
+                          </TableCell>
+                          <TableCell>
+                            {req.dateGiven ? dayjs(req.dateGiven).format('DD/MM/YYYY') : '—'}
+                          </TableCell>
+                          <TableCell>{dayjs(req.dueDate).format('DD/MM/YYYY')}</TableCell>
+                          <TableCell>
+                            <Chip
+                              label={req.status?.replace('_', ' ') || 'UNKNOWN'}
+                              size="small"
+                              sx={{
+                                fontWeight: 600, fontSize: '0.75rem',
+                                color: req.status === 'ELIGIBLE' ? '#059669' : req.status === 'NOT_ELIGIBLE' ? '#dc2626' : '#d97706',
+                                bgcolor: req.status === 'ELIGIBLE' ? '#d1fae5' : req.status === 'NOT_ELIGIBLE' ? '#fee2e2' : '#fef3c7',
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">{req.reviewedByName || '—'}</Typography>
                           </TableCell>
                         </TableRow>
                       ))}
