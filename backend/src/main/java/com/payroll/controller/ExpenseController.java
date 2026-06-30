@@ -8,7 +8,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -78,6 +80,15 @@ public class ExpenseController {
             @RequestBody Map<String, String> request,
             @RequestAttribute("userId") UUID userId) {
         return ResponseEntity.ok(expenseService.rejectExpense(id, userId, request.get("reason")));
+    }
+
+    @GetMapping("/export/approved-excel")
+    public ResponseEntity<byte[]> exportApprovedExpensesToExcel() {
+        byte[] data = expenseService.exportApprovedExpensesToExcel();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=approved-expenses.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(data);
     }
 
     private boolean hasRole(String role) {

@@ -19,6 +19,10 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -226,5 +230,206 @@ public class ExpenseServiceImpl implements ExpenseService {
         notificationService.createNotification(expense.getCreatedBy().getId(), title, message, "EXPENSE", "/expenses");
 
         return saved;
+    }
+
+    @Override
+    public byte[] exportApprovedExpensesToExcel() {
+        List<Expense> approvedExpenses = expenseRepository.findByStatus(ExpenseStatus.APPROVED);
+
+        try (Workbook workbook = new XSSFWorkbook();
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
+
+            Sheet sheet = workbook.createSheet("Approved Expenses");
+
+            // --- Styles ---
+            CellStyle headerStyle = workbook.createCellStyle();
+            Font headerFont = workbook.createFont();
+            headerFont.setBold(true);
+            headerFont.setColor(IndexedColors.WHITE.getIndex());
+            headerFont.setFontHeightInPoints((short) 11);
+            headerStyle.setFont(headerFont);
+            headerStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            headerStyle.setBorderBottom(BorderStyle.THIN);
+            headerStyle.setBorderTop(BorderStyle.THIN);
+            headerStyle.setBorderLeft(BorderStyle.THIN);
+            headerStyle.setBorderRight(BorderStyle.THIN);
+            headerStyle.setAlignment(HorizontalAlignment.CENTER);
+            headerStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle textStyle = workbook.createCellStyle();
+            textStyle.setBorderBottom(BorderStyle.THIN);
+            textStyle.setBorderTop(BorderStyle.THIN);
+            textStyle.setBorderLeft(BorderStyle.THIN);
+            textStyle.setBorderRight(BorderStyle.THIN);
+            textStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle currencyStyle = workbook.createCellStyle();
+            currencyStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
+            currencyStyle.setBorderBottom(BorderStyle.THIN);
+            currencyStyle.setBorderTop(BorderStyle.THIN);
+            currencyStyle.setBorderLeft(BorderStyle.THIN);
+            currencyStyle.setBorderRight(BorderStyle.THIN);
+            currencyStyle.setAlignment(HorizontalAlignment.RIGHT);
+            currencyStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            CellStyle dateStyle = workbook.createCellStyle();
+            dateStyle.setDataFormat(workbook.createDataFormat().getFormat("dd-mmm-yyyy"));
+            dateStyle.setBorderBottom(BorderStyle.THIN);
+            dateStyle.setBorderTop(BorderStyle.THIN);
+            dateStyle.setBorderLeft(BorderStyle.THIN);
+            dateStyle.setBorderRight(BorderStyle.THIN);
+            dateStyle.setAlignment(HorizontalAlignment.CENTER);
+            dateStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+            // --- Title row ---
+            Row titleRow = sheet.createRow(0);
+            titleRow.setHeightInPoints(24);
+            Cell titleCell = titleRow.createCell(0);
+            titleCell.setCellValue("Approved Expenses Report");
+            CellStyle titleStyle = workbook.createCellStyle();
+            Font titleFont = workbook.createFont();
+            titleFont.setBold(true);
+            titleFont.setFontHeightInPoints((short) 14);
+            titleFont.setColor(IndexedColors.WHITE.getIndex());
+            titleStyle.setFont(titleFont);
+            titleStyle.setFillForegroundColor(IndexedColors.DARK_BLUE.getIndex());
+            titleStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            titleStyle.setAlignment(HorizontalAlignment.CENTER);
+            titleStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+            titleCell.setCellStyle(titleStyle);
+            sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(0, 0, 0, 6));
+
+            // --- Header row ---
+            String[] headers = {"S/N", "Item", "Amount (ZMW)", "Expense Date", "Submitted By", "Approved By", "Approved At"};
+            Row headerRow = sheet.createRow(2);
+            headerRow.setHeightInPoints(20);
+            for (int i = 0; i < headers.length; i++) {
+                Cell cell = headerRow.createCell(i);
+                cell.setCellValue(headers[i]);
+                cell.setCellStyle(headerStyle);
+            }
+
+            // --- Data rows ---
+            int rowNum = 3;
+            for (int i = 0; i < approvedExpenses.size(); i++) {
+                Expense exp = approvedExpenses.get(i);
+                Row row = sheet.createRow(rowNum++);
+
+                // S/N
+                Cell snCell = row.createCell(0);
+                snCell.setCellValue(i + 1);
+                snCell.setCellStyle(textStyle);
+
+                // Item
+                Cell itemCell = row.createCell(1);
+                itemCell.setCellValue(exp.getItem());
+                itemCell.setCellStyle(textStyle);
+
+                // Amount
+                Cell amtCell = row.createCell(2);
+                amtCell.setCellValue(exp.getAmount().doubleValue());
+                amtCell.setCellStyle(currencyStyle);
+
+                // Expense Date
+                Cell dateCell = row.createCell(3);
+                dateCell.setCellValue(exp.getExpenseDate());
+                dateCell.setCellStyle(dateStyle);
+
+                // Submitted By
+                Cell submitterCell = row.createCell(4);
+                String submitterName = exp.getCreatedBy().getFirstName() + " " + exp.getCreatedBy().getLastName();
+                submitterCell.setCellValue(submitterName);
+                submitterCell.setCellStyle(textStyle);
+
+                // Approved By
+                Cell approverCell = row.createCell(5);
+                if (exp.getApprovedBy() != null) {
+                    approverCell.setCellValue(exp.getApprovedBy().getFirstName() + " " + exp.getApprovedBy().getLastName());
+                } else {
+                    approverCell.setCellValue("");
+                }
+                approverCell.setCellStyle(textStyle);
+
+                // Approved At
+                Cell approvedAtCell = row.createCell(6);
+                if (exp.getApprovedAt() != null) {
+                    approvedAtCell.setCellValue(exp.getApprovedAt());
+                    CellStyle dateTimeStyle = workbook.createCellStyle();
+                    dateTimeStyle.setDataFormat(workbook.createDataFormat().getFormat("dd-mmm-yyyy hh:mm"));
+                    dateTimeStyle.setBorderBottom(BorderStyle.THIN);
+                    dateTimeStyle.setBorderTop(BorderStyle.THIN);
+                    dateTimeStyle.setBorderLeft(BorderStyle.THIN);
+                    dateTimeStyle.setBorderRight(BorderStyle.THIN);
+                    dateTimeStyle.setAlignment(HorizontalAlignment.CENTER);
+                    dateTimeStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+                    approvedAtCell.setCellStyle(dateTimeStyle);
+                } else {
+                    approvedAtCell.setCellValue("");
+                    approvedAtCell.setCellStyle(textStyle);
+                }
+            }
+
+            // --- Summary row ---
+            if (!approvedExpenses.isEmpty()) {
+                Row summaryRow = sheet.createRow(rowNum + 1);
+                Cell totalLabel = summaryRow.createCell(0);
+                totalLabel.setCellValue("TOTAL");
+                CellStyle totalLabelStyle = workbook.createCellStyle();
+                Font boldFont = workbook.createFont();
+                boldFont.setBold(true);
+                boldFont.setFontHeightInPoints((short) 11);
+                totalLabelStyle.setFont(boldFont);
+                totalLabelStyle.setBorderTop(BorderStyle.DOUBLE);
+                totalLabelStyle.setAlignment(HorizontalAlignment.RIGHT);
+                totalLabelStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+                totalLabel.setCellStyle(totalLabelStyle);
+
+                summaryRow.createCell(1).setCellStyle(totalLabelStyle);
+
+                double totalAmount = approvedExpenses.stream()
+                        .mapToDouble(e -> e.getAmount().doubleValue())
+                        .sum();
+                Cell totalValue = summaryRow.createCell(2);
+                totalValue.setCellValue(totalAmount);
+                CellStyle totalValueStyle = workbook.createCellStyle();
+                Font boldCurrencyFont = workbook.createFont();
+                boldCurrencyFont.setBold(true);
+                boldCurrencyFont.setFontHeightInPoints((short) 11);
+                totalValueStyle.setFont(boldCurrencyFont);
+                totalValueStyle.setBorderTop(BorderStyle.DOUBLE);
+                totalValueStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
+                totalValueStyle.setAlignment(HorizontalAlignment.RIGHT);
+                totalValueStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+                totalValue.setCellStyle(totalValueStyle);
+
+                // Count row
+                Row countRow = sheet.createRow(rowNum + 2);
+                Cell countLabel = countRow.createCell(0);
+                countLabel.setCellValue("Total Items:");
+                countLabel.setCellStyle(totalLabelStyle);
+                countRow.createCell(1).setCellStyle(totalLabelStyle);
+                Cell countValue = countRow.createCell(2);
+                countValue.setCellValue(approvedExpenses.size());
+                CellStyle intBoldStyle = workbook.createCellStyle();
+                intBoldStyle.setFont(boldCurrencyFont);
+                intBoldStyle.setBorderTop(BorderStyle.DOUBLE);
+                intBoldStyle.setAlignment(HorizontalAlignment.RIGHT);
+                intBoldStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+                countValue.setCellStyle(intBoldStyle);
+            }
+
+            // Auto-size columns
+            for (int i = 0; i < 7; i++) {
+                sheet.autoSizeColumn(i);
+            }
+            sheet.setColumnWidth(1, Math.max(sheet.getColumnWidth(1), 5000));
+
+            workbook.write(bos);
+            return bos.toByteArray();
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to export approved expenses to Excel", e);
+        }
     }
 }
