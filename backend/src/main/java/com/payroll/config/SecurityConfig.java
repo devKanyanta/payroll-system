@@ -56,6 +56,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/reports/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR", "ROLE_MANAGER")
                 .requestMatchers("/api/notifications/**").authenticated()
                 .requestMatchers("/api/dashboard/**").authenticated()
+                .requestMatchers("/api/cashflow/**").hasAuthority("ROLE_ADMIN")
                 // PPE Catalog — Admin + HR
                 .requestMatchers("/api/ppe-catalog/**").hasAnyAuthority("ROLE_ADMIN", "ROLE_HR")
                 // PPE Requests — Admin + HR can read

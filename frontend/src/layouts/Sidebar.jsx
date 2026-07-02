@@ -18,7 +18,7 @@ import {
   Assessment as ReportsIcon,
   History as AuditIcon,
   ChevronLeft, ChevronRight, ExpandLess, ExpandMore,
-  AttachMoney, HealthAndSafety,
+  AttachMoney, HealthAndSafety, AccountBalanceWallet,
 } from '@mui/icons-material';
 
 const menuItems = [
@@ -47,6 +47,7 @@ const menuItems = [
       { text: 'PPE Catalog', icon: <HealthAndSafety />, path: '/ppe-catalog' },
     ],
   },
+  { text: 'Cashflow', icon: <AccountBalanceWallet />, path: '/cashflow' },
   { text: 'Expenses', icon: <ExpenseIcon />, path: '/expenses' },
   { text: 'Reports', icon: <ReportsIcon />, path: '/reports' },
   { text: 'Users', icon: <UsersIcon />, path: '/users' },
@@ -109,6 +110,7 @@ export default function Sidebar({ open, onToggle, role }) {
           if (item.text === 'Users' && role !== 'ADMIN') return null;
           if (item.text === 'Audit Logs' && role !== 'ADMIN') return null;
           if (item.text === 'Settings' && role !== 'ADMIN') return null;
+          if (item.text === 'Cashflow' && role !== 'ADMIN') return null;
 
           if (item.children) {
             return (

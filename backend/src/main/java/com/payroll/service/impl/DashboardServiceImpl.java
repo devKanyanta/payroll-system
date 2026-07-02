@@ -2,7 +2,9 @@ package com.payroll.service.impl;
 
 import com.payroll.entity.LoanStatus;
 import com.payroll.entity.PayrollRunStatus;
+import com.payroll.dto.CashflowSummaryResponse;
 import com.payroll.repository.*;
+import com.payroll.service.CashflowService;
 import com.payroll.service.DashboardService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final UserRepository userRepository;
     private final DepartmentRepository departmentRepository;
     private final AuditLogRepository auditLogRepository;
+    private final CashflowService cashflowService;
 
     @Override
     public Map<String, Object> getDashboardStats() {
@@ -123,6 +126,15 @@ public class DashboardServiceImpl implements DashboardService {
             recentActivity.add(entry);
         }
         stats.put("recentActivity", recentActivity);
+
+        // ── Cashflow Summary (for admin dashboard) ──
+        try {
+            CashflowSummaryResponse cashflow = cashflowService.getCashflowSummary(currentMonth, currentYear);
+            stats.put("cashflow", cashflow);
+        } catch (Exception e) {
+            // Don't fail dashboard if cashflow isn't available
+            stats.put("cashflow", null);
+        }
 
         return stats;
     }

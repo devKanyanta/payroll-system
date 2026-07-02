@@ -17,6 +17,7 @@ import PayrollRunDetails from '../pages/PayrollRunDetails';
 import PayrollImport from '../pages/PayrollImport';
 import Payslips from '../pages/Payslips';
 import Expenses from '../pages/Expenses';
+import Cashflow from '../pages/Cashflow';
 import Settings from '../pages/Settings';
 import Users from '../pages/Users';
 import Reports from '../pages/Reports';
@@ -73,6 +74,11 @@ export default function AppRoutes() {
         <Route path="/audit-logs" element={
           <ProtectedRoute roles={['ADMIN']}>
             <AuditLogs />
+          </ProtectedRoute>
+        } />
+        <Route path="/cashflow" element={
+          <ProtectedRoute roles={['ADMIN']}>
+            <Cashflow />
           </ProtectedRoute>
         } />
 

@@ -1,17 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Box, Grid, Card, CardContent, Typography, Skeleton,
   LinearProgress, Chip, Avatar, Stack, Button, Divider,
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   alpha, useTheme,
 } from '@mui/material';
 import {
   People, AttachMoney, PendingActions, Business,
   AccountBalance, Receipt, TrendingUp,
   GroupAdd, CalendarMonth, Description, TrackChanges,
-  MoreHoriz,
+  MoreHoriz, Assessment, MoneyOff,
 } from '@mui/icons-material';
 import { dashboardService } from '../services/dashboardService';
+import { useAuth } from '../contexts/AuthContext';
 
 // ─── Stat Card Configuration ───
 
@@ -583,10 +585,142 @@ function QuickActionsSection() {
   );
 }
 
+// ─── Company Cashflow Section (Admin Only) ───
+
+function CompanyCashflow({ cashflow, isLoading }) {
+  const theme = useTheme();
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent sx={{ p: 3 }}>
+          <Skeleton width="40%" height={28} sx={{ mb: 2 }} />
+          <Stack spacing={1.5}>
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} height={40} />
+            ))}
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!cashflow || !cashflow.sites || cashflow.sites.every(s => s.subTotal === 0)) {
+    return (
+      <Card>
+        <CardContent sx={{ p: 3, textAlign: 'center', py: 5 }}>
+          <Assessment sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }} />
+          <Typography variant="h6" color="text.secondary" gutterBottom>
+            No Cashflow Data
+          </Typography>
+          <Typography variant="body2" color="text.disabled" sx={{ mb: 2 }}>
+            Enter revenue data in Cashflow Management to see the company financial summary here.
+          </Typography>
+          <Button
+            variant="outlined"
+            component={Link}
+            to="/cashflow"
+            startIcon={<Assessment />}
+          >
+            Manage Cashflow
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const profit = cashflow.companyProfit;
+  const profitColor = profit >= 0 ? '#059669' : '#dc2626';
+
+  return (
+    <Card sx={{ height: '100%' }}>
+      <CardContent sx={{ p: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Typography variant="h6" fontWeight={700}>Company Cashflow</Typography>
+          <Button
+            size="small"
+            component={Link}
+            to="/cashflow"
+            endIcon={<Assessment />}
+            sx={{ textTransform: 'none' }}
+          >
+            Manage
+          </Button>
+        </Box>
+
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary' }}>Site</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary' }}>Sub Total</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary' }}>Total</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {cashflow.sites.map((site) => (
+                <TableRow key={site.site}>
+                  <TableCell>
+                    <Typography variant="body2" fontWeight={500}>{site.site}</Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {formatCurrency(site.subTotal)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Typography variant="body2" fontWeight={600} sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {formatCurrency(site.total)}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <Divider sx={{ my: 1.5 }} />
+
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+          <Typography variant="body2" fontWeight={600}>Total Monthly Revenue</Typography>
+          <Typography variant="body2" fontWeight={700} color="primary.main">
+            {formatCurrency(cashflow.totalSubMonthlyAccumulated)}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+          <Typography variant="body2" color="text.secondary">Employee Gross Pay</Typography>
+          <Typography variant="body2" fontWeight={500} color="warning.main">
+            {formatCurrency(cashflow.employeeGrossPay)}
+          </Typography>
+        </Box>
+        <Divider sx={{ my: 1 }} />
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="body1" fontWeight={800}>Company Profit</Typography>
+          <Typography variant="h6" fontWeight={800} color={profitColor}>
+            {formatCurrency(profit)}
+          </Typography>
+        </Box>
+
+        {profit > 0 && (
+          <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <TrendingUp fontSize="small" color="success" />
+            <Typography variant="caption" color="text.secondary">
+              Profit margin: {((profit / cashflow.totalSubMonthlyAccumulated) * 100).toFixed(1)}%
+            </Typography>
+          </Box>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Main Dashboard Component ───
 
 export default function Dashboard() {
   const theme = useTheme();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: async () => {
@@ -636,21 +770,40 @@ export default function Dashboard() {
         ))}
       </Grid>
 
-      {/* Payroll Summary + Department Distribution */}
+      {/* Payroll Summary + Cashflow (Admin) / Department Distribution */}
       <Grid container spacing={2.5} sx={{ mb: 3 }}>
-        <Grid item xs={12} md={6}>
+        <Grid item xs={12} md={isAdmin ? 6 : 6}>
           <PayrollSummary
             summary={stats?.payrollSummary}
             isLoading={isLoading}
           />
         </Grid>
-        <Grid item xs={12} md={6}>
-          <DepartmentDistribution
-            departments={stats?.employeeByDepartment}
-            isLoading={isLoading}
-          />
+        <Grid item xs={12} md={isAdmin ? 6 : 6}>
+          {isAdmin ? (
+            <CompanyCashflow
+              cashflow={stats?.cashflow}
+              isLoading={isLoading}
+            />
+          ) : (
+            <DepartmentDistribution
+              departments={stats?.employeeByDepartment}
+              isLoading={isLoading}
+            />
+          )}
         </Grid>
       </Grid>
+
+      {/* Department Distribution (non-admin) or both layout */}
+      {isAdmin && (
+        <Grid container spacing={2.5} sx={{ mb: 3 }}>
+          <Grid item xs={12} md={6}>
+            <DepartmentDistribution
+              departments={stats?.employeeByDepartment}
+              isLoading={isLoading}
+            />
+          </Grid>
+        </Grid>
+      )}
 
       {/* Quick Actions + Recent Activity */}
       <Grid container spacing={2.5}>

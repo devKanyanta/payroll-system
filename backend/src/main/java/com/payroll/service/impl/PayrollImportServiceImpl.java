@@ -8,6 +8,7 @@ import com.payroll.service.AuditService;
 import com.payroll.service.FileStorageService;
 import com.payroll.service.PayrollImportService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.core.io.ByteArrayResource;
@@ -25,6 +26,7 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PayrollImportServiceImpl implements PayrollImportService {
 
     private final PayrollImportRepository payrollImportRepository;
@@ -36,6 +38,7 @@ public class PayrollImportServiceImpl implements PayrollImportService {
     private final LoanRepository loanRepository;
     private final FileStorageService fileStorageService;
     private final AuditService auditService;
+    private final CashflowRevenueRepository cashflowRevenueRepository;
 
     @Override
     @Transactional
@@ -330,6 +333,13 @@ public class PayrollImportServiceImpl implements PayrollImportService {
                 successRows++;
             }
 
+            // ── Step 4: Parse and save Company Cash Flow section ──
+            try {
+                parseAndSaveCashflowSection(sheet, payrollRun);
+            } catch (Exception e) {
+                log.warn("Could not parse cashflow section from import: {}", e.getMessage());
+            }
+
             payrollImport.setTotalRows(totalRows);
             payrollImport.setSuccessRows(successRows);
             payrollImport.setErrorRows(0);
@@ -457,6 +467,129 @@ public class PayrollImportServiceImpl implements PayrollImportService {
      * Holds a parsed row and its matched employee during validation.
      */
     private record RowData(Row row, Employee employee) {}
+
+    /**
+     * Parses the Company Cash Flow section from the payroll Excel and saves it
+     * to the cashflow_revenues table for the given payroll run's month/year.
+     * <p>
+     * Expected Excel layout (starting after employee data rows):
+     *   Row N:   "Company Cash Flow"           (header)
+     *   Row N+1: (blank)
+     *   Row N+2: [Site headers with amounts in adjacent columns]
+     *   Row N+3: "Sub Total" in col E, values in col F,H,J,M
+     *   Row N+4: "Vat @ 16%"  in col E, values in col F,H,J,M
+     *   Row N+5: "Total"      in col E, values in col F,H,J,M
+     * <p>
+     * Known sites: Kitwe Invoice, Mufulira Smelter, Mufulira Mining, Chingola
+     */
+    private void parseAndSaveCashflowSection(Sheet sheet, PayrollRun payrollRun) {
+        // Scan for the "Company Cash Flow" header row
+        int headerRow = -1;
+        for (int i = 0; i <= sheet.getLastRowNum(); i++) {
+            Row row = sheet.getRow(i);
+            if (row != null) {
+                // Look in column E (index 4) for the cashflow header
+                String val = getCellStringValue(row.getCell(4));
+                if (val != null && val.equalsIgnoreCase("Company Cash Flow")) {
+                    headerRow = i;
+                    break;
+                }
+            }
+        }
+
+        if (headerRow == -1) {
+            log.info("No 'Company Cash Flow' section found in the import file — skipping cashflow import");
+            return;
+        }
+
+        int month = payrollRun.getMonth();
+        int year = payrollRun.getYear();
+
+        // Site amount column indices (0-based POI column index)
+        // The Excel layout places each site's numeric value in a dedicated column:
+        //   Kitwe Invoice       → Col F (idx 5)
+        //   Mufulira Smelter    → Col H (idx 7)
+        //   Mufulira Mining     → Col J (idx 9)
+        //   Chingola            → Col M (idx 12)
+        Map<String, Integer> siteAmountCols = new LinkedHashMap<>();
+        siteAmountCols.put("Kitwe Invoice", 5);
+        siteAmountCols.put("Mufulira Smelter", 7);
+        siteAmountCols.put("Mufulira Mining", 9);
+        siteAmountCols.put("Chingola", 12);
+
+        // Parse the three data rows: Sub Total, Vat, and Total
+        Map<String, BigDecimal> subTotals = new HashMap<>();
+        Map<String, BigDecimal> vatAmounts = new HashMap<>();
+        Map<String, BigDecimal> totals = new HashMap<>();
+
+        for (int i = headerRow + 2; i <= sheet.getLastRowNum(); i++) {
+            Row row = sheet.getRow(i);
+            if (row == null) continue;
+
+            String label = getCellStringValue(row.getCell(4)); // Column E
+            if (label == null) continue;
+
+            if (label.equalsIgnoreCase("Sub Total")) {
+                for (Map.Entry<String, Integer> entry : siteAmountCols.entrySet()) {
+                    subTotals.put(entry.getKey(), getNumericCellValue(row.getCell(entry.getValue())));
+                }
+            } else if (label.toLowerCase().contains("vat")) {
+                for (Map.Entry<String, Integer> entry : siteAmountCols.entrySet()) {
+                    vatAmounts.put(entry.getKey(), getNumericCellValue(row.getCell(entry.getValue())));
+                }
+            } else if (label.equalsIgnoreCase("Total")) {
+                for (Map.Entry<String, Integer> entry : siteAmountCols.entrySet()) {
+                    totals.put(entry.getKey(), getNumericCellValue(row.getCell(entry.getValue())));
+                }
+            }
+            // Stop after processing all three data rows — they should be consecutive
+            if (!subTotals.isEmpty() && !vatAmounts.isEmpty() && !totals.isEmpty()) {
+                break;
+            }
+        }
+
+        // Only proceed if we found at least one non-zero value
+        boolean hasData = subTotals.values().stream().anyMatch(v -> v.compareTo(BigDecimal.ZERO) > 0);
+        if (!hasData) {
+            log.info("Cashflow section found but all values are zero — skipping save");
+            return;
+        }
+
+        // Remove any existing cashflow revenues for this month/year before inserting
+        List<CashflowRevenue> existing = cashflowRevenueRepository.findByMonthAndYearOrderBySiteAsc(month, year);
+        if (!existing.isEmpty()) {
+            cashflowRevenueRepository.deleteAll(existing);
+        }
+
+        // Save each site's revenue data
+        for (Map.Entry<String, Integer> entry : siteAmountCols.entrySet()) {
+            String site = entry.getKey();
+            BigDecimal subTotal = subTotals.getOrDefault(site, BigDecimal.ZERO);
+            BigDecimal vatAmount = vatAmounts.getOrDefault(site, BigDecimal.ZERO);
+            BigDecimal total = totals.getOrDefault(site, BigDecimal.ZERO);
+
+            // Skip sites with no data
+            if (subTotal.compareTo(BigDecimal.ZERO) == 0
+                    && vatAmount.compareTo(BigDecimal.ZERO) == 0
+                    && total.compareTo(BigDecimal.ZERO) == 0) {
+                continue;
+            }
+
+            CashflowRevenue revenue = CashflowRevenue.builder()
+                    .site(site)
+                    .subTotal(subTotal)
+                    .vatRate(new BigDecimal("16.00"))
+                    .vatAmount(vatAmount)
+                    .total(total)
+                    .month(month)
+                    .year(year)
+                    .build();
+
+            cashflowRevenueRepository.save(revenue);
+        }
+
+        log.info("Successfully imported cashflow data for {}/{} from payroll Excel", month, year);
+    }
 
     private BigDecimal getNumericCellValue(Cell cell) {
         if (cell == null) return BigDecimal.ZERO;

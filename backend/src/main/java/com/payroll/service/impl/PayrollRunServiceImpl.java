@@ -1,5 +1,6 @@
 package com.payroll.service.impl;
 
+import com.payroll.dto.CashflowSummaryResponse;
 import com.payroll.dto.PagedResponse;
 import com.payroll.entity.*;
 import com.payroll.exception.BadRequestException;
@@ -45,6 +46,7 @@ public class PayrollRunServiceImpl implements PayrollRunService {
     private final PayslipRepository payslipRepository;
     private final PayrollImportRepository payrollImportRepository;
     private final EmailService emailService;
+    private final CashflowService cashflowService;
 
     @Value("${app.admin-email}")
     private String adminEmail;
@@ -979,6 +981,148 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                     sumCell.setCellValue(sum);
                     sumCell.setCellStyle(totalRowValueStyle);
                 }
+            }
+
+            // ────────────────────────────────────────────────────────────
+            // COMPANY CASHFLOW SECTION
+            // ────────────────────────────────────────────────────────────
+            int cashflowStartRow = rowNum + 2; // Leave a blank row after totals
+
+            try {
+                int month = payrollRun.getMonth();
+                int year = payrollRun.getYear();
+                CashflowSummaryResponse cashflow = cashflowService.getCashflowSummary(month, year);
+
+                if (cashflow != null && cashflow.getSites() != null && cashflow.getSites().stream().anyMatch(s -> s.getSubTotal().compareTo(BigDecimal.ZERO) > 0)) {
+                    // Cashflow section header
+                    CellStyle cashflowSectionStyle = workbook.createCellStyle();
+                    Font cfsFont = workbook.createFont();
+                    cfsFont.setBold(true);
+                    cfsFont.setFontHeightInPoints((short) 12);
+                    cfsFont.setColor(IndexedColors.WHITE.getIndex());
+                    cashflowSectionStyle.setFont(cfsFont);
+                    cashflowSectionStyle.setFillForegroundColor(IndexedColors.DARK_GREEN.getIndex());
+                    cashflowSectionStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+                    cashflowSectionStyle.setAlignment(HorizontalAlignment.CENTER);
+                    cashflowSectionStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+                    // Cashflow header row
+                    Row cfHeaderRow = sheet.createRow(cashflowStartRow);
+                    cfHeaderRow.setHeightInPoints(22);
+                    Cell cfTitleCell = cfHeaderRow.createCell(0);
+                    cfTitleCell.setCellValue("COMPANY CASH FLOW — " + periodStr);
+                    cfTitleCell.setCellStyle(cashflowSectionStyle);
+                    // Merge across first 4 columns
+                    sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(cashflowStartRow, cashflowStartRow, 0, 4));
+
+                    // Cashflow headers (row below the title)
+                    String[] cfHeaders = {"Site", "Sub Total", "VAT @ 16%", "Total"};
+                    Row cfHeaderRow2 = sheet.createRow(cashflowStartRow + 1);
+                    cfHeaderRow2.setHeightInPoints(20);
+                    for (int i = 0; i < cfHeaders.length; i++) {
+                        Cell cell = cfHeaderRow2.createCell(i);
+                        cell.setCellValue(cfHeaders[i]);
+                        cell.setCellStyle(navyHeaderStyle);
+                    }
+
+                    int cfRowNum = cashflowStartRow + 2;
+                    BigDecimal grandTotal = BigDecimal.ZERO;
+
+                    for (CashflowSummaryResponse.SiteRevenue site : cashflow.getSites()) {
+                        Row row = sheet.createRow(cfRowNum++);
+                        row.setHeightInPoints(18);
+
+                        Cell siteCell = row.createCell(0);
+                        siteCell.setCellValue(site.getSite());
+                        siteCell.setCellStyle(textStyle);
+
+                        Cell subTotalCell = row.createCell(1);
+                        subTotalCell.setCellValue(site.getSubTotal().doubleValue());
+                        subTotalCell.setCellStyle(currencyStyle);
+
+                        Cell vatCell = row.createCell(2);
+                        vatCell.setCellValue(site.getVatAmount().doubleValue());
+                        vatCell.setCellStyle(currencyStyle);
+
+                        Cell totalCell = row.createCell(3);
+                        totalCell.setCellValue(site.getTotal().doubleValue());
+                        totalCell.setCellStyle(currencyStyle);
+
+                        grandTotal = grandTotal.add(site.getTotal());
+                    }
+
+                    // Grand total row
+                    Row cfTotalRow = sheet.createRow(cfRowNum);
+                    cfTotalRow.setHeightInPoints(20);
+
+                    Cell cfTotalLabel = cfTotalRow.createCell(0);
+                    cfTotalLabel.setCellValue("Total Sub Monthly Accumulated");
+                    cfTotalLabel.setCellStyle(totalRowLabelStyle);
+
+                    cfTotalRow.createCell(1).setCellStyle(totalRowLabelStyle);
+                    cfTotalRow.createCell(2).setCellStyle(totalRowLabelStyle);
+
+                    Cell cfTotalValue = cfTotalRow.createCell(3);
+                    cfTotalValue.setCellValue(grandTotal.doubleValue());
+                    cfTotalValue.setCellStyle(totalRowValueStyle);
+
+                    CellStyle boldLabelStyle = workbook.createCellStyle();
+                    Font boldLabelFont = workbook.createFont();
+                    boldLabelFont.setBold(true);
+                    boldLabelFont.setFontHeightInPoints((short) 10);
+                    boldLabelStyle.setFont(boldLabelFont);
+                    boldLabelStyle.setBorderBottom(BorderStyle.THIN);
+                    boldLabelStyle.setBorderTop(BorderStyle.THIN);
+                    boldLabelStyle.setBorderLeft(BorderStyle.THIN);
+                    boldLabelStyle.setBorderRight(BorderStyle.THIN);
+                    boldLabelStyle.setAlignment(HorizontalAlignment.LEFT);
+                    boldLabelStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+
+                    // Employee Gross Pay row
+                    cfRowNum++;
+                    Row grossPayRow = sheet.createRow(cfRowNum);
+                    grossPayRow.setHeightInPoints(18);
+
+                    Cell grossPayLabel = grossPayRow.createCell(0);
+                    grossPayLabel.setCellValue("Employee Gross Pay:");
+                    grossPayLabel.setCellStyle(boldLabelStyle);
+
+                    grossPayRow.createCell(1).setCellStyle(boldLabelStyle);
+                    grossPayRow.createCell(2).setCellStyle(boldLabelStyle);
+
+                    Cell grossPayValue = grossPayRow.createCell(3);
+                    grossPayValue.setCellValue(cashflow.getEmployeeGrossPay().doubleValue());
+                    grossPayValue.setCellStyle(currencyStyle);
+
+                    // Company Profit row
+                    cfRowNum++;
+                    Row profitRow = sheet.createRow(cfRowNum);
+                    profitRow.setHeightInPoints(20);
+
+                    Cell profitLabel = profitRow.createCell(0);
+                    profitLabel.setCellValue("Company Profit:");
+                    profitLabel.setCellStyle(totalRowLabelStyle);
+
+                    profitRow.createCell(1).setCellStyle(totalRowLabelStyle);
+                    profitRow.createCell(2).setCellStyle(totalRowLabelStyle);
+
+                    Cell profitValue = profitRow.createCell(3);
+                    profitValue.setCellValue(cashflow.getCompanyProfit().doubleValue());
+                    CellStyle profitValueStyle = workbook.createCellStyle();
+                    Font profitFont = workbook.createFont();
+                    profitFont.setBold(true);
+                    profitFont.setFontHeightInPoints((short) 11);
+                    profitFont.setColor(IndexedColors.DARK_GREEN.getIndex());
+                    profitValueStyle.setFont(profitFont);
+                    profitValueStyle.setBorderTop(BorderStyle.DOUBLE);
+                    profitValueStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
+                    profitValueStyle.setAlignment(HorizontalAlignment.RIGHT);
+                    profitValueStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+                    profitValue.setCellStyle(profitValueStyle);
+                }
+            } catch (Exception e) {
+                // Don't fail the export if cashflow data isn't available
+                log.warn("Could not include cashflow section in payroll export: {}", e.getMessage());
             }
 
             // Auto-size columns for better readability
