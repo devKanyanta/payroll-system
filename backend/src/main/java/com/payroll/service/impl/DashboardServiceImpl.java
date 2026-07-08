@@ -1,7 +1,9 @@
 package com.payroll.service.impl;
 
+import com.payroll.entity.ExpenseStatus;
 import com.payroll.entity.LoanStatus;
 import com.payroll.entity.PayrollRunStatus;
+import com.payroll.entity.PpeRequestStatus;
 import com.payroll.dto.CashflowSummaryResponse;
 import com.payroll.repository.*;
 import com.payroll.service.CashflowService;
@@ -27,6 +29,7 @@ public class DashboardServiceImpl implements DashboardService {
     private final DepartmentRepository departmentRepository;
     private final AuditLogRepository auditLogRepository;
     private final CashflowService cashflowService;
+    private final PpeRequestRepository ppeRequestRepository;
 
     @Override
     public Map<String, Object> getDashboardStats() {
@@ -90,7 +93,13 @@ public class DashboardServiceImpl implements DashboardService {
         }
 
         // ── Pending approvals (payrolls submitted and awaiting review) ──
-        stats.put("pendingPayrolls", payrollRunRepository.findByStatus(PayrollRunStatus.SUBMITTED).size());
+        long pendingPayrolls = payrollRunRepository.findByStatus(PayrollRunStatus.SUBMITTED).size();
+        long pendingPpeRequests = ppeRequestRepository.countByStatus(PpeRequestStatus.PENDING);
+        long pendingExpenses = expenseRepository.findByStatus(ExpenseStatus.PENDING).size();
+        stats.put("pendingPayrolls", pendingPayrolls);
+        stats.put("pendingPpeRequests", pendingPpeRequests);
+        stats.put("pendingExpenses", pendingExpenses);
+        stats.put("totalPending", pendingPayrolls + pendingPpeRequests + pendingExpenses);
 
         // ── Monthly expenses ──
         LocalDate monthStart = LocalDate.of(currentYear, currentMonth, 1);

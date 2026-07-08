@@ -18,11 +18,12 @@ import {
   Assessment as ReportsIcon,
   History as AuditIcon,
   ChevronLeft, ChevronRight, ExpandLess, ExpandMore,
-  AttachMoney, HealthAndSafety, AccountBalanceWallet,
+  AttachMoney, HealthAndSafety, AccountBalanceWallet, PendingActions,
 } from '@mui/icons-material';
 
 const menuItems = [
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+  { text: 'Pending Approvals', icon: <PendingActions />, path: '/pending-approvals' },
   {
     text: 'Employees', icon: <PeopleIcon />,
     children: [

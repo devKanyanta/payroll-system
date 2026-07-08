@@ -47,12 +47,12 @@ const statCards = () => [
   },
   {
     label: 'Pending Approvals',
-    key: 'pendingPayrolls',
+    key: 'totalPending',
     icon: <PendingActions />,
     gradient: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
     format: 'number',
-    subtitle: 'Payroll runs to review',
-    link: '/payroll-runs',
+    subtitle: '{pendingPayrolls} payroll · {pendingPpeRequests} PPE · {pendingExpenses} expenses',
+    link: '/pending-approvals',
   },
   {
     label: 'Active Loans',

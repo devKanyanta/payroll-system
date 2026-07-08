@@ -22,6 +22,7 @@ import Settings from '../pages/Settings';
 import Users from '../pages/Users';
 import Reports from '../pages/Reports';
 import AuditLogs from '../pages/AuditLogs';
+import PendingApprovals from '../pages/PendingApprovals';
 import PpeRequests from '../pages/PpeRequests';
 import PpeRequestForm from '../pages/PpeRequestForm';
 import PpeRequestDetail from '../pages/PpeRequestDetail';
@@ -61,6 +62,11 @@ export default function AppRoutes() {
         <Route path="/change-password" element={<ChangePassword />} />
 
         {/* Admin-only routes */}
+        <Route path="/pending-approvals" element={
+          <ProtectedRoute roles={['ADMIN', 'HR']}>
+            <PendingApprovals />
+          </ProtectedRoute>
+        } />
         <Route path="/users" element={
           <ProtectedRoute roles={['ADMIN']}>
             <Users />

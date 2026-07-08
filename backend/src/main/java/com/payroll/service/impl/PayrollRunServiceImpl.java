@@ -171,8 +171,8 @@ public class PayrollRunServiceImpl implements PayrollRunService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
 
-        if (payrollRunRepository.existsByMonthAndYear(month, year)) {
-            throw new BadRequestException("Payroll run already exists for " + month + "/" + year);
+        if (payrollRunRepository.countByMonthAndYear(month, year) >= 2) {
+            throw new BadRequestException("Payroll runs already exist for " + month + "/" + year + " (maximum 2 allowed)");
         }
 
         PayrollRun payrollRun = PayrollRun.builder()

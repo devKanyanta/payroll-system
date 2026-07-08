@@ -60,7 +60,7 @@ export default function PpeRequestDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ppe-request', id] });
       queryClient.invalidateQueries({ queryKey: ['ppe-requests'] });
-      setSnackbar({ open: true, message: 'PPE request approved — employee is now Eligible', severity: 'success' });
+      setSnackbar({ open: true, message: 'PPE request approved — marked as Not Eligible', severity: 'success' });
     },
     onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to approve', severity: 'error' }),
   });
@@ -90,7 +90,6 @@ export default function PpeRequestDetail() {
   if (isLoading) return <LoadingScreen />;
   if (!request) return <Typography>PPE request not found</Typography>;
 
-  const dueDatePassed = dayjs(request.dueDate).isBefore(dayjs(), 'day');
   const canReview = isAdmin && request.status === 'PENDING' && request.requestedById !== user?.id;
   const canEdit = request.status === 'PENDING';
 
@@ -206,27 +205,20 @@ export default function PpeRequestDetail() {
                   <History sx={{ mr: 0.5, verticalAlign: 'middle', fontSize: 20 }} />
                   Admin Review Required
                 </Typography>
-                {!dueDatePassed ? (
-                  <Alert severity="info" sx={{ mb: 2 }}>
-                    This employee is <strong>not yet eligible</strong> — the due date ({dayjs(request.dueDate).format('DD/MM/YYYY')}) has not passed.
-                    Approval will be available once the due date has passed.
-                  </Alert>
-                ) : (
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    The due date has passed. Review this PPE request and determine eligibility.
-                  </Typography>
-                )}
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  Review this PPE request and determine eligibility.
+                </Alert>
                 <Stack direction="row" spacing={1.5}>
                   <Button
                     variant="contained"
                     color="success"
                     startIcon={<CheckCircle />}
                     onClick={() => approveMutation.mutate()}
-                    disabled={approveMutation.isPending || !dueDatePassed}
+                    disabled={approveMutation.isPending}
                     fullWidth
                     sx={{ fontWeight: 600 }}
                   >
-                    {dueDatePassed ? 'Approve' : 'Due Date Not Passed'}
+                    Approve
                   </Button>
                   <Button
                     variant="outlined"

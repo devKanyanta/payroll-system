@@ -218,18 +218,10 @@ public class PpeRequestServiceImpl implements PpeRequestService {
             throw new BusinessRuleException("An admin cannot approve their own PPE request");
         }
 
-        // Validate that the due date has passed (eligibility gated by due date)
-        if (!ppeRequest.getDueDate().isBefore(LocalDate.now())) {
-            throw new BusinessRuleException(
-                "Cannot approve — the due date (" + ppeRequest.getDueDate() + ") has not yet passed. " +
-                "Employee is only eligible after the due date."
-            );
-        }
-
         User reviewedBy = userRepository.findById(reviewedByUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", reviewedByUserId));
 
-        ppeRequest.setStatus(PpeRequestStatus.ELIGIBLE);
+        ppeRequest.setStatus(PpeRequestStatus.NOT_ELIGIBLE);
         ppeRequest.setReviewedBy(reviewedBy);
         ppeRequest.setDateGiven(LocalDate.now());
 
@@ -242,7 +234,7 @@ public class PpeRequestServiceImpl implements PpeRequestService {
                 "PPE_REQUEST",
                 saved.getId().toString(),
                 "PENDING",
-                "ELIGIBLE",
+                "NOT_ELIGIBLE",
                 null
         );
 

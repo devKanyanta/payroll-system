@@ -7,7 +7,8 @@ import { AccessTime } from '@mui/icons-material';
 import { getMsUntilExpiry } from '../utils/jwt';
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://api.mesltd.co.zm';
+// const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 // Show the warning when the token has less than this much time remaining
 const WARNING_THRESHOLD_MS = 3 * 60 * 1000; // 3 minutes
