@@ -559,6 +559,7 @@ public class PayrollImportServiceImpl implements PayrollImportService {
         List<CashflowRevenue> existing = cashflowRevenueRepository.findByMonthAndYearOrderBySiteAsc(month, year);
         if (!existing.isEmpty()) {
             cashflowRevenueRepository.deleteAll(existing);
+            cashflowRevenueRepository.flush();
         }
 
         // Save each site's revenue data
