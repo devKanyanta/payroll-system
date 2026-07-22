@@ -73,9 +73,10 @@ public class PpeRequestController {
     }
 
     @PutMapping("/{id}/reject")
-    public ResponseEntity<PpeRequestResponse> rejectRequest(
+    public ResponseEntity<Void> rejectRequest(
             @PathVariable UUID id,
             @RequestAttribute("userId") UUID userId) {
-        return ResponseEntity.ok(ppeRequestService.rejectRequest(id, userId));
+        ppeRequestService.rejectRequest(id, userId);
+        return ResponseEntity.noContent().build();
     }
 }

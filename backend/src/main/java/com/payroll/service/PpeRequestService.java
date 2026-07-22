@@ -16,5 +16,5 @@ public interface PpeRequestService {
     PpeRequestResponse updateRequest(UUID id, PpeRequestRequest request);
     void deleteRequest(UUID id);
     PpeRequestResponse approveRequest(UUID id, UUID reviewedByUserId);
-    PpeRequestResponse rejectRequest(UUID id, UUID reviewedByUserId);
+    void rejectRequest(UUID id, UUID reviewedByUserId);
 }

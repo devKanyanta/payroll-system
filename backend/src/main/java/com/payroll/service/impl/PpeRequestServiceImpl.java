@@ -244,7 +244,7 @@ public class PpeRequestServiceImpl implements PpeRequestService {
 
     @Override
     @Transactional
-    public PpeRequestResponse rejectRequest(UUID id, UUID reviewedByUserId) {
+    public void rejectRequest(UUID id, UUID reviewedByUserId) {
         PpeRequest ppeRequest = ppeRequestRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PPE Request", id));
 
@@ -257,27 +257,20 @@ public class PpeRequestServiceImpl implements PpeRequestService {
             throw new BusinessRuleException("An admin cannot reject their own PPE request");
         }
 
-        User reviewedBy = userRepository.findById(reviewedByUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("User", reviewedByUserId));
-
-        ppeRequest.setStatus(PpeRequestStatus.NOT_ELIGIBLE);
-        ppeRequest.setReviewedBy(reviewedBy);
-
-        PpeRequest saved = ppeRequestRepository.save(ppeRequest);
-
-        // Audit log
+        // Audit log before deleting
         auditService.logEvent(
                 reviewedByUserId,
                 "REJECTED",
                 "PPE_REQUEST",
-                saved.getId().toString(),
+                ppeRequest.getId().toString(),
                 "PENDING",
-                "NOT_ELIGIBLE",
+                "DELETED",
                 null
         );
 
-        log.info("PPE request {} rejected by user {}", saved.getId(), reviewedByUserId);
-        return toResponse(saved);
+        ppeRequestRepository.delete(ppeRequest);
+
+        log.info("PPE request {} rejected and deleted by user {}", id, reviewedByUserId);
     }
 
     /**

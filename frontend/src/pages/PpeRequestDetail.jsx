@@ -68,9 +68,9 @@ export default function PpeRequestDetail() {
   const rejectMutation = useMutation({
     mutationFn: () => ppeRequestService.reject(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['ppe-request', id] });
       queryClient.invalidateQueries({ queryKey: ['ppe-requests'] });
-      setSnackbar({ open: true, message: 'PPE request rejected — marked as Not Eligible', severity: 'info' });
+      queryClient.invalidateQueries({ queryKey: ['ppe-requests-pending'] });
+      navigate('/ppe');
     },
     onError: (err) => setSnackbar({ open: true, message: err.response?.data?.message || 'Failed to reject', severity: 'error' }),
   });
