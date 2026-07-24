@@ -4,17 +4,41 @@ import {
   Box, Typography, Button, TextField, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, Card, CardContent, Grid,
   TablePagination, IconButton, Dialog, DialogTitle, DialogContent,
-  DialogActions, Chip, Tooltip, Stack, Snackbar, Alert,
+  DialogActions, Chip, Tooltip, Stack, Snackbar, Alert, MenuItem,
 } from '@mui/material';
 import {
   Add, Edit, Delete, CheckCircle, Cancel, FileDownload,
+  ChevronLeft, ChevronRight,
 } from '@mui/icons-material';
 import { expenseService } from '../services/expenseService';
 import LoadingScreen from '../components/LoadingScreen';
 import ConfirmDialog from '../components/ConfirmDialog';
 import dayjs from 'dayjs';
 
-const emptyExpense = { item: '', amount: '', remarks: '', expenseDate: dayjs().format('YYYY-MM-DD') };
+const MONTHS = [
+  { value: 0, label: 'January' },
+  { value: 1, label: 'February' },
+  { value: 2, label: 'March' },
+  { value: 3, label: 'April' },
+  { value: 4, label: 'May' },
+  { value: 5, label: 'June' },
+  { value: 6, label: 'July' },
+  { value: 7, label: 'August' },
+  { value: 8, label: 'September' },
+  { value: 9, label: 'October' },
+  { value: 10, label: 'November' },
+  { value: 11, label: 'December' },
+];
+
+const now = dayjs();
+const emptyExpense = { item: '', amount: '', remarks: '', expenseDate: now.format('YYYY-MM-DD') };
+
+function getMonthDateRange(year, month) {
+  // month is 0-indexed (Jan = 0)
+  const start = dayjs().year(year).month(month).startOf('month');
+  const end = dayjs().year(year).month(month).endOf('month');
+  return { start: start.format('YYYY-MM-DD'), end: end.format('YYYY-MM-DD') };
+}
 
 const STATUS_COLORS = {
   PENDING: { color: '#d97706', bg: '#fef3c7' },
@@ -43,8 +67,8 @@ function StatusChip({ status }) {
 export default function Expenses() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(now.month());
+  const [selectedYear, setSelectedYear] = useState(now.year());
   const [statusFilter, setStatusFilter] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -64,16 +88,38 @@ export default function Expenses() {
 
   const isAdmin = user?.role === 'ADMIN';
 
+  const { start, end } = getMonthDateRange(selectedYear, selectedMonth);
+
+  const goToPrevMonth = () => {
+    if (selectedMonth === 0) {
+      setSelectedMonth(11);
+      setSelectedYear((y) => y - 1);
+    } else {
+      setSelectedMonth((m) => m - 1);
+    }
+    setPage(0);
+  };
+
+  const goToNextMonth = () => {
+    if (selectedMonth === 11) {
+      setSelectedMonth(0);
+      setSelectedYear((y) => y + 1);
+    } else {
+      setSelectedMonth((m) => m + 1);
+    }
+    setPage(0);
+  };
+
   const buildParams = () => {
     const params = { page, size: rowsPerPage, sort: 'expenseDate,desc' };
-    if (startDate) params.start = startDate;
-    if (endDate) params.end = endDate;
+    params.start = start;
+    params.end = end;
     if (statusFilter) params.status = statusFilter;
     return params;
   };
 
   const { data: pageData, isLoading } = useQuery({
-    queryKey: ['expenses', page, rowsPerPage, startDate, endDate, statusFilter],
+    queryKey: ['expenses', page, rowsPerPage, selectedMonth, selectedYear, statusFilter],
     queryFn: async () => {
       const res = await expenseService.getAll(buildParams());
       return res.data;
@@ -162,9 +208,9 @@ export default function Expenses() {
           <Button
             variant="outlined"
             startIcon={<FileDownload />}
-            onClick={() => expenseService.exportApprovedExcel()}
+            onClick={() => expenseService.exportMonthExcel(selectedMonth + 1, selectedYear)}
           >
-            Export Approved
+            Export {MONTHS[selectedMonth].label}
           </Button>
           <Button variant="contained" startIcon={<Add />} onClick={openCreate}>
             Add Expense
@@ -172,21 +218,39 @@ export default function Expenses() {
         </Box>
       </Box>
 
-      {/* Filters */}
+      {/* Month Navigation & Filters */}
       <Card sx={{ mb: 3 }}>
         <CardContent sx={{ pb: '12px !important' }}>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={6} sm={3}>
-              <TextField fullWidth label="From" type="date" size="small"
-                value={startDate}
-                onChange={(e) => { setStartDate(e.target.value); setPage(0); }}
-                InputLabelProps={{ shrink: true }} />
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <TextField fullWidth label="To" type="date" size="small"
-                value={endDate}
-                onChange={(e) => { setEndDate(e.target.value); setPage(0); }}
-                InputLabelProps={{ shrink: true }} />
+            {/* Month navigation */}
+            <Grid item xs={12} sm={6}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <IconButton size="small" onClick={goToPrevMonth} sx={{ border: '1px solid', borderColor: 'divider' }}>
+                  <ChevronLeft />
+                </IconButton>
+                <TextField
+                  select
+                  size="small"
+                  value={selectedMonth}
+                  onChange={(e) => { setSelectedMonth(Number(e.target.value)); setPage(0); }}
+                  sx={{ minWidth: 140 }}
+                >
+                  {MONTHS.map((m) => (
+                    <MenuItem key={m.value} value={m.value}>{m.label}</MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  size="small"
+                  type="number"
+                  value={selectedYear}
+                  onChange={(e) => { setSelectedYear(Number(e.target.value)); setPage(0); }}
+                  sx={{ width: 90 }}
+                  inputProps={{ min: 2020, max: 2100 }}
+                />
+                <IconButton size="small" onClick={goToNextMonth} sx={{ border: '1px solid', borderColor: 'divider' }}>
+                  <ChevronRight />
+                </IconButton>
+              </Box>
             </Grid>
             <Grid item xs={6} sm={3}>
               <TextField
@@ -202,8 +266,9 @@ export default function Expenses() {
               </TextField>
             </Grid>
             <Grid item xs={6} sm={3}>
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'right' }}>
-                {pageData?.totalElements || 0} expense{(pageData?.totalElements || 0) !== 1 ? 's' : ''}
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'right' }}>
+                <strong>{pageData?.totalElements || 0}</strong> expense{(pageData?.totalElements || 0) !== 1 ? 's' : ''}
+                {' '}for {MONTHS[selectedMonth].label} {selectedYear}
               </Typography>
             </Grid>
           </Grid>

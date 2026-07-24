@@ -9,10 +9,13 @@ export const expenseService = {
   delete: (id) => api.delete(`/expenses/${id}`),
   approve: (id) => api.put(`/expenses/${id}/approve`),
   reject: (id, reason) => api.put(`/expenses/${id}/reject`, { reason }),
-  exportApprovedExcel: async () => {
-    const res = await api.get('/expenses/export/approved-excel', {
+  exportMonthExcel: async (month, year) => {
+    const res = await api.get('/expenses/export/excel', {
+      params: { month, year },
       responseType: 'blob',
     });
-    downloadBlob(res.data, 'approved-expenses.xlsx');
+    const monthNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+    const filename = `expenses-${monthNames[month - 1]}-${year}.xlsx`;
+    downloadBlob(res.data, filename);
   },
 };

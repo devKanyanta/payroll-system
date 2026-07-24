@@ -233,8 +233,13 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     @Override
-    public byte[] exportApprovedExpensesToExcel() {
-        List<Expense> approvedExpenses = expenseRepository.findByStatus(ExpenseStatus.APPROVED);
+    public byte[] exportApprovedExpensesToExcel(Integer month, Integer year) {
+        // Determine which month/year to export
+        LocalDate now = LocalDate.now();
+        int exportMonth = (month != null) ? month : now.getMonthValue();
+        int exportYear = (year != null) ? year : now.getYear();
+
+        List<Expense> approvedExpenses = expenseRepository.findApprovedByMonth(exportMonth, exportYear);
 
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
@@ -286,7 +291,9 @@ public class ExpenseServiceImpl implements ExpenseService {
             Row titleRow = sheet.createRow(0);
             titleRow.setHeightInPoints(24);
             Cell titleCell = titleRow.createCell(0);
-            titleCell.setCellValue("Approved Expenses Report");
+            java.time.Month expMonth = java.time.Month.of(exportMonth);
+            String monthName = expMonth.name().charAt(0) + expMonth.name().substring(1).toLowerCase();
+            titleCell.setCellValue("Approved Expenses — " + monthName + " " + exportYear);
             CellStyle titleStyle = workbook.createCellStyle();
             Font titleFont = workbook.createFont();
             titleFont.setBold(true);

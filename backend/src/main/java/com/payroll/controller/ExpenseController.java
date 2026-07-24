@@ -82,11 +82,20 @@ public class ExpenseController {
         return ResponseEntity.ok(expenseService.rejectExpense(id, userId, request.get("reason")));
     }
 
-    @GetMapping("/export/approved-excel")
-    public ResponseEntity<byte[]> exportApprovedExpensesToExcel() {
-        byte[] data = expenseService.exportApprovedExpensesToExcel();
+    @GetMapping("/export/excel")
+    public ResponseEntity<byte[]> exportExpensesToExcel(
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
+        byte[] data = expenseService.exportApprovedExpensesToExcel(month, year);
+
+        java.time.LocalDate now = java.time.LocalDate.now();
+        int m = (month != null) ? month : now.getMonthValue();
+        int y = (year != null) ? year : now.getYear();
+        String filename = String.format("expenses-%s-%d.xlsx",
+                java.time.Month.of(m).toString().toLowerCase(), y);
+
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=approved-expenses.xlsx")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
                 .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
                 .body(data);
     }
