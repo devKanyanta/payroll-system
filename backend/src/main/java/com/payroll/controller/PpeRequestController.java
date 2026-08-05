@@ -23,6 +23,7 @@ public class PpeRequestController {
     @GetMapping
     public ResponseEntity<List<PpeRequestResponse>> getAllRequests(
             @RequestParam(required = false) UUID employeeId) {
+        ppeRequestService.processDuePpeRequests();
         if (employeeId != null) {
             return ResponseEntity.ok(ppeRequestService.getRequestsByEmployee(employeeId));
         }
@@ -31,16 +32,19 @@ public class PpeRequestController {
 
     @GetMapping("/pending")
     public ResponseEntity<List<PpeRequestResponse>> getPendingRequests() {
+        ppeRequestService.processDuePpeRequests();
         return ResponseEntity.ok(ppeRequestService.getPendingRequests());
     }
 
     @GetMapping("/pending/count")
     public ResponseEntity<Map<String, Long>> getPendingRequestCount() {
+        ppeRequestService.processDuePpeRequests();
         return ResponseEntity.ok(Map.of("count", ppeRequestService.getPendingRequestCount()));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<PpeRequestResponse> getRequestById(@PathVariable UUID id) {
+        ppeRequestService.processDuePpeRequests();
         return ResponseEntity.ok(ppeRequestService.getRequestById(id));
     }
 

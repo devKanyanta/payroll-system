@@ -17,4 +17,12 @@ public interface PpeRequestService {
     void deleteRequest(UUID id);
     PpeRequestResponse approveRequest(UUID id, UUID reviewedByUserId);
     void rejectRequest(UUID id, UUID reviewedByUserId);
+
+    /**
+     * Flip reviewed (NOT_ELIGIBLE) PPE requests to ELIGIBLE once their due date has arrived,
+     * and notify admins (email + in-app notification) for each newly due request.
+     *
+     * @return the number of requests that became ELIGIBLE in this run
+     */
+    int processDuePpeRequests();
 }

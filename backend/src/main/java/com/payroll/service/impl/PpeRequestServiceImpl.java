@@ -9,18 +9,23 @@ import com.payroll.exception.BusinessRuleException;
 import com.payroll.exception.ResourceNotFoundException;
 import com.payroll.repository.*;
 import com.payroll.service.AuditService;
+import com.payroll.service.EmailService;
 import com.payroll.service.NotificationService;
 import com.payroll.service.PpeRequestService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +38,14 @@ public class PpeRequestServiceImpl implements PpeRequestService {
     private final EmployeeRepository employeeRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final EmailService emailService;
     private final AuditService auditService;
+
+    @Value("${app.admin-email:}")
+    private String configuredAdminEmail;
+
+    @Value("${app.frontend-url:}")
+    private String frontendUrl;
 
     @Override
     @Transactional(readOnly = true)
@@ -271,6 +283,86 @@ public class PpeRequestServiceImpl implements PpeRequestService {
         ppeRequestRepository.delete(ppeRequest);
 
         log.info("PPE request {} rejected and deleted by user {}", id, reviewedByUserId);
+    }
+
+    @Override
+    @Transactional
+    public int processDuePpeRequests() {
+        List<PpeRequest> dueRequests = ppeRequestRepository
+                .findByStatusAndDueDateLessThanEqual(PpeRequestStatus.NOT_ELIGIBLE, LocalDate.now());
+
+        if (dueRequests.isEmpty()) {
+            return 0;
+        }
+
+        dueRequests.forEach(request -> request.setStatus(PpeRequestStatus.ELIGIBLE));
+        ppeRequestRepository.saveAll(dueRequests);
+
+        notifyAdminsOfDuePpe(dueRequests);
+
+        log.info("PPE due-date processing: {} request(s) marked ELIGIBLE", dueRequests.size());
+        return dueRequests.size();
+    }
+
+    /**
+     * Notify all admins (email + in-app notification) that PPE has become due for one or more workers.
+     */
+    private void notifyAdminsOfDuePpe(List<PpeRequest> dueRequests) {
+        List<User> admins = userRepository.findByRole(Role.ADMIN);
+        if (admins.isEmpty() && (configuredAdminEmail == null || configuredAdminEmail.isBlank())) {
+            log.warn("No admin email addresses configured — skipping PPE due email");
+            return;
+        }
+
+        Set<String> recipients = new LinkedHashSet<>();
+        admins.stream()
+                .map(User::getEmail)
+                .filter(email -> email != null && !email.isBlank())
+                .forEach(recipients::add);
+        if (configuredAdminEmail != null && !configuredAdminEmail.isBlank()) {
+            recipients.add(configuredAdminEmail);
+        }
+
+        // Build a single digest email listing every newly due PPE request
+        StringBuilder body = new StringBuilder();
+        body.append("The following PPE has become due for replacement:\n\n");
+        for (PpeRequest request : dueRequests) {
+            String employeeName = request.getEmployee().getFirstName() + " " + request.getEmployee().getLastName();
+            String items = request.getRequestItems().stream()
+                    .map(item -> item.getCatalogItem().getName())
+                    .collect(Collectors.joining(", "));
+            body.append("• ").append(employeeName)
+                    .append(" (").append(request.getEmployee().getEmployeeNumber()).append(")\n")
+                    .append("  Items: ").append(items).append("\n")
+                    .append("  Due date: ").append(request.getDueDate()).append("\n");
+            if (frontendUrl != null && !frontendUrl.isBlank()) {
+                body.append("  Review: ").append(frontendUrl).append("/ppe/").append(request.getId()).append("\n");
+            }
+            body.append("\n");
+        }
+        body.append("Please log in to review and take action.");
+
+        String subject = "PPE Due Alert — " + dueRequests.size()
+                + (dueRequests.size() == 1 ? " item" : " items") + " due for replacement";
+
+        for (String recipient : recipients) {
+            emailService.sendSimpleMessage(recipient, subject, body.toString());
+        }
+
+        // In-app notifications for admin users
+        for (User admin : admins) {
+            for (PpeRequest request : dueRequests) {
+                String employeeName = request.getEmployee().getFirstName() + " " + request.getEmployee().getLastName();
+                int itemCount = request.getRequestItems().size();
+                notificationService.createNotification(
+                        admin.getId(),
+                        "PPE Due — " + employeeName,
+                        employeeName + "'s PPE is due — " + itemCount + " item(s), due " + request.getDueDate(),
+                        "PPE_REQUEST",
+                        "/ppe/" + request.getId()
+                );
+            }
+        }
     }
 
     /**
