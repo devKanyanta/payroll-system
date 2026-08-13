@@ -117,6 +117,23 @@ public class CashflowServiceImpl implements CashflowService {
     }
 
     @Override
+    @Transactional
+    public List<CashflowRevenue> recalculateTotals(int month, int year) {
+        List<CashflowRevenue> revenues = cashflowRevenueRepository.findByMonthAndYearOrderBySiteAsc(month, year);
+
+        for (CashflowRevenue rev : revenues) {
+            BigDecimal vatRate = rev.getVatRate() != null ? rev.getVatRate() : new BigDecimal("16.00");
+            BigDecimal vatAmount = rev.getSubTotal().multiply(vatRate).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+            rev.setVatAmount(vatAmount);
+            rev.setTotal(rev.getSubTotal().add(vatAmount));
+        }
+
+        cashflowRevenueRepository.saveAll(revenues);
+        log.info("Recalculated cashflow totals for {}/{}", month, year);
+        return revenues;
+    }
+
+    @Override
     public CashflowSummaryResponse getCashflowSummary(int month, int year) {
         List<CashflowRevenue> revenues = cashflowRevenueRepository.findByMonthAndYearOrderBySiteAsc(month, year);
 

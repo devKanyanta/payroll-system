@@ -13,6 +13,7 @@ public interface CashflowService {
     CashflowRevenue createRevenue(CashflowRevenueRequest request);
     CashflowRevenue updateRevenue(UUID id, CashflowRevenueRequest request);
     void deleteRevenue(UUID id);
+    List<CashflowRevenue> recalculateTotals(int month, int year);
     CashflowSummaryResponse getCashflowSummary(int month, int year);
     List<Integer> getAvailableYears();
 }

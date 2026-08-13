@@ -21,4 +21,7 @@ export const cashflowService = {
 
   batchUpdate: (requests) =>
     api.post('/cashflow/batch', requests),
+
+  recalculate: (month, year) =>
+    api.post('/cashflow/recalculate', null, { params: { month, year } }),
 };

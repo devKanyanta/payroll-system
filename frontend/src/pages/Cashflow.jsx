@@ -45,6 +45,7 @@ export default function Cashflow() {
   const [revenues, setRevenues] = useState({});
   const [hasChanges, setHasChanges] = useState(false);
   const [saveLoading, setSaveLoading] = useState(false);
+  const [recalcLoading, setRecalcLoading] = useState(false);
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['cashflow-summary', selectedMonth, selectedYear],
@@ -89,6 +90,21 @@ export default function Cashflow() {
       [site]: { ...prev[site], subTotal: value },
     }));
     setHasChanges(true);
+  };
+
+  const handleRecalculate = async () => {
+    setRecalcLoading(true);
+    try {
+      await cashflowService.recalculate(selectedMonth, selectedYear);
+      // Recompute VAT/total for every stored revenue this month, then refresh
+      queryClient.invalidateQueries({ queryKey: ['cashflow-revenues', selectedMonth, selectedYear] });
+      queryClient.invalidateQueries({ queryKey: ['cashflow-summary', selectedMonth, selectedYear] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    } catch (error) {
+      console.error('Failed to recalculate cashflow totals:', error);
+    } finally {
+      setRecalcLoading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -148,6 +164,16 @@ export default function Cashflow() {
               {[2024, 2025, 2026].map((y) => <MenuItem key={y} value={y}>{y}</MenuItem>)}
             </Select>
           </FormControl>
+
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={recalcLoading ? <CircularProgress size={18} /> : <Refresh />}
+            onClick={handleRecalculate}
+            disabled={recalcLoading}
+          >
+            {recalcLoading ? 'Recalculating...' : 'Recalculate Totals'}
+          </Button>
 
           {hasChanges && (
             <Button

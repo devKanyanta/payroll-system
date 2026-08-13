@@ -45,6 +45,15 @@ public class CashflowController {
         return ResponseEntity.ok(cashflowService.getRevenueById(id));
     }
 
+    @PostMapping("/recalculate")
+    public ResponseEntity<List<CashflowRevenue>> recalculateCashflowTotals(
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) Integer year) {
+        if (month == null) month = LocalDate.now().getMonthValue();
+        if (year == null) year = LocalDate.now().getYear();
+        return ResponseEntity.ok(cashflowService.recalculateTotals(month, year));
+    }
+
     @GetMapping("/years")
     public ResponseEntity<List<Integer>> getAvailableYears() {
         return ResponseEntity.ok(cashflowService.getAvailableYears());
