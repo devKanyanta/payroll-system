@@ -18,6 +18,7 @@ public class CashflowSummaryResponse {
     private int year;
     private List<SiteRevenue> sites;
     private BigDecimal totalSubMonthlyAccumulated;
+    private BigDecimal totalAfterVat;
     private BigDecimal employeeGrossPay;
     private BigDecimal companyProfit;
 

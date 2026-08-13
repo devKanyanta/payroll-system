@@ -204,10 +204,13 @@ export default function Cashflow() {
                 </Box>
                 <Box>
                   <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                    Total Revenue
+                    Total Revenue (Before VAT)
                   </Typography>
                   <Typography variant="h5" fontWeight={800}>
                     {formatCurrency(summary?.totalSubMonthlyAccumulated || 0)}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    After VAT: {formatCurrency(summary?.totalAfterVat || 0)}
                   </Typography>
                 </Box>
               </Stack>
@@ -302,14 +305,19 @@ export default function Cashflow() {
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700 }}>Site</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Sub Total (ZMW)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total (ZMW)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Sub Total (Before VAT)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>VAT Rate (%)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>VAT Amount (ZMW)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Total (After VAT)</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {SITES.map((site) => {
                   const rev = revenues[site] || { subTotal: '0', vatRate: '16.00' };
                   const subTotal = parseFloat(rev.subTotal) || 0;
+                  const vatRate = parseFloat(rev.vatRate) || 16;
+                  const vatAmount = (subTotal * vatRate) / 100;
+                  const total = subTotal + vatAmount;
 
                   return (
                     <TableRow key={site} hover>
@@ -329,12 +337,26 @@ export default function Cashflow() {
                         />
                       </TableCell>
                       <TableCell align="right">
+                        <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {vatRate}%
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography
+                          variant="body2"
+                          fontWeight={500}
+                          sx={{ fontVariantNumeric: 'tabular-nums', color: 'text.secondary' }}
+                        >
+                          {formatCurrency(vatAmount)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
                         <Typography
                           variant="body2"
                           fontWeight={700}
                           sx={{ fontVariantNumeric: 'tabular-nums' }}
                         >
-                          {formatCurrency(subTotal)}
+                          {formatCurrency(total)}
                         </Typography>
                       </TableCell>
                     </TableRow>
@@ -359,17 +381,23 @@ export default function Cashflow() {
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 700 }}>Item</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>Amount (ZMW)</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>Before VAT (ZMW)</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>After VAT (ZMW)</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {summary.sites.map((site) => (
                     <TableRow key={site.site} hover>
                       <TableCell>
-                        <Typography variant="body2">{site.site} — Total</Typography>
+                        <Typography variant="body2">{site.site}</Typography>
                       </TableCell>
                       <TableCell align="right">
                         <Typography variant="body2" fontWeight={500} sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {formatCurrency(site.subTotal)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Typography variant="body2" fontWeight={600} sx={{ fontVariantNumeric: 'tabular-nums' }}>
                           {formatCurrency(site.total)}
                         </Typography>
                       </TableCell>
@@ -384,6 +412,11 @@ export default function Cashflow() {
                         {formatCurrency(summary.totalSubMonthlyAccumulated)}
                       </Typography>
                     </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, borderTop: '2px solid' }}>
+                      <Typography variant="body1" fontWeight={800} color="primary.main">
+                        {formatCurrency(summary.totalAfterVat)}
+                      </Typography>
+                    </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>
@@ -394,6 +427,7 @@ export default function Cashflow() {
                         {formatCurrency(summary.employeeGrossPay)}
                       </Typography>
                     </TableCell>
+                    <TableCell />
                   </TableRow>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 700, borderTop: '2px solid' }}>
@@ -404,6 +438,7 @@ export default function Cashflow() {
                         {formatCurrency(summary.companyProfit)}
                       </Typography>
                     </TableCell>
+                    <TableCell sx={{ borderTop: '2px solid' }} />
                   </TableRow>
                 </TableBody>
               </Table>

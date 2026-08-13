@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -71,9 +72,8 @@ public class CashflowServiceImpl implements CashflowService {
 
         BigDecimal vatRate = request.getVatRate() != null ? request.getVatRate() : new BigDecimal("16.00");
         BigDecimal subTotal = request.getSubTotal() != null ? request.getSubTotal() : BigDecimal.ZERO;
-        // No VAT math — sub total is the full amount
-        BigDecimal vatAmount = BigDecimal.ZERO;
-        BigDecimal total = subTotal;
+        BigDecimal vatAmount = subTotal.multiply(vatRate).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+        BigDecimal total = subTotal.add(vatAmount);
 
         CashflowRevenue revenue = CashflowRevenue.builder()
                 .site(request.getSite())
@@ -96,9 +96,8 @@ public class CashflowServiceImpl implements CashflowService {
 
         BigDecimal vatRate = request.getVatRate() != null ? request.getVatRate() : revenue.getVatRate();
         BigDecimal subTotal = request.getSubTotal() != null ? request.getSubTotal() : BigDecimal.ZERO;
-        // No VAT math — sub total is the full amount
-        BigDecimal vatAmount = BigDecimal.ZERO;
-        BigDecimal total = subTotal;
+        BigDecimal vatAmount = subTotal.multiply(vatRate).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+        BigDecimal total = subTotal.add(vatAmount);
 
         revenue.setSite(request.getSite());
         revenue.setSubTotal(subTotal);
@@ -123,9 +122,10 @@ public class CashflowServiceImpl implements CashflowService {
         List<CashflowRevenue> revenues = cashflowRevenueRepository.findByMonthAndYearOrderBySiteAsc(month, year);
 
         for (CashflowRevenue rev : revenues) {
-            // No VAT math — sub total is the full amount
-            rev.setVatAmount(BigDecimal.ZERO);
-            rev.setTotal(rev.getSubTotal());
+            BigDecimal vatRate = rev.getVatRate() != null ? rev.getVatRate() : new BigDecimal("16.00");
+            BigDecimal vatAmount = rev.getSubTotal().multiply(vatRate).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+            rev.setVatAmount(vatAmount);
+            rev.setTotal(rev.getSubTotal().add(vatAmount));
         }
 
         cashflowRevenueRepository.saveAll(revenues);
@@ -162,6 +162,7 @@ public class CashflowServiceImpl implements CashflowService {
         }).collect(Collectors.toList());
 
         BigDecimal totalSubMonthly = cashflowRevenueRepository.sumSubTotalByMonthAndYear(month, year);
+        BigDecimal totalAfterVat = cashflowRevenueRepository.sumTotalByMonthAndYear(month, year);
 
         // Get employee gross pay from this month's payroll run
         BigDecimal employeeGrossPay = BigDecimal.ZERO;
@@ -178,6 +179,7 @@ public class CashflowServiceImpl implements CashflowService {
                 .year(year)
                 .sites(siteRevenues)
                 .totalSubMonthlyAccumulated(totalSubMonthly)
+                .totalAfterVat(totalAfterVat)
                 .employeeGrossPay(employeeGrossPay)
                 .companyProfit(companyProfit)
                 .build();

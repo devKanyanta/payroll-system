@@ -682,9 +682,15 @@ function CompanyCashflow({ cashflow, isLoading }) {
         <Divider sx={{ my: 1.5 }} />
 
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-          <Typography variant="body2" fontWeight={600}>Total Monthly Revenue</Typography>
+          <Typography variant="body2" fontWeight={600}>Total Monthly Revenue (Before VAT)</Typography>
           <Typography variant="body2" fontWeight={700} color="primary.main">
             {formatCurrency(cashflow.totalSubMonthlyAccumulated)}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+          <Typography variant="body2" fontWeight={600}>Total Monthly Revenue (After VAT)</Typography>
+          <Typography variant="body2" fontWeight={700} color="primary.main">
+            {formatCurrency(cashflow.totalAfterVat)}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>

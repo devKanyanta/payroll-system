@@ -580,9 +580,8 @@ public class PayrollImportServiceImpl implements PayrollImportService {
                     .site(site)
                     .subTotal(subTotal)
                     .vatRate(new BigDecimal("16.00"))
-                    // No VAT math — sub total is the full amount
-                    .vatAmount(BigDecimal.ZERO)
-                    .total(subTotal)
+                    .vatAmount(vatAmount)
+                    .total(total)
                     .month(month)
                     .year(year)
                     .build();
