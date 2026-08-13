@@ -96,7 +96,7 @@ export default function Cashflow() {
     setRecalcLoading(true);
     try {
       await cashflowService.recalculate(selectedMonth, selectedYear);
-      // Recompute VAT/total for every stored revenue this month, then refresh
+      // Recompute totals for every stored revenue this month, then refresh
       queryClient.invalidateQueries({ queryKey: ['cashflow-revenues', selectedMonth, selectedYear] });
       queryClient.invalidateQueries({ queryKey: ['cashflow-summary', selectedMonth, selectedYear] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -303,8 +303,6 @@ export default function Cashflow() {
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700 }}>Site</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Sub Total (ZMW)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>VAT Rate (%)</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>VAT Amount (ZMW)</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 700 }}>Total (ZMW)</TableCell>
                 </TableRow>
               </TableHead>
@@ -312,9 +310,6 @@ export default function Cashflow() {
                 {SITES.map((site) => {
                   const rev = revenues[site] || { subTotal: '0', vatRate: '16.00' };
                   const subTotal = parseFloat(rev.subTotal) || 0;
-                  const vatRate = parseFloat(rev.vatRate) || 16;
-                  const vatAmount = (subTotal * vatRate) / 100;
-                  const total = subTotal + vatAmount;
 
                   return (
                     <TableRow key={site} hover>
@@ -334,26 +329,12 @@ export default function Cashflow() {
                         />
                       </TableCell>
                       <TableCell align="right">
-                        <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                          {vatRate}%
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography
-                          variant="body2"
-                          fontWeight={500}
-                          sx={{ fontVariantNumeric: 'tabular-nums', color: 'text.secondary' }}
-                        >
-                          {formatCurrency(vatAmount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">
                         <Typography
                           variant="body2"
                           fontWeight={700}
                           sx={{ fontVariantNumeric: 'tabular-nums' }}
                         >
-                          {formatCurrency(total)}
+                          {formatCurrency(subTotal)}
                         </Typography>
                       </TableCell>
                     </TableRow>
