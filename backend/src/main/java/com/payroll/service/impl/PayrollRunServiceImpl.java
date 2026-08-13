@@ -1048,7 +1048,7 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                         totalCell.setCellValue(site.getTotal().doubleValue());
                         totalCell.setCellStyle(currencyStyle);
 
-                        grandTotal = grandTotal.add(site.getTotal());
+                        grandTotal = grandTotal.add(site.getSubTotal());
                     }
 
                     // Grand total row
