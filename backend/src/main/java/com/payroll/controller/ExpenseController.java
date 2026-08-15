@@ -84,15 +84,20 @@ public class ExpenseController {
 
     @GetMapping("/export/excel")
     public ResponseEntity<byte[]> exportExpensesToExcel(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end,
+            @RequestParam(required = false) ExpenseStatus status,
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer year) {
-        byte[] data = expenseService.exportApprovedExpensesToExcel(month, year);
+        byte[] data = expenseService.exportExpensesToExcel(start, end, status);
 
+        // Filename: prefer the explicit date range, fall back to month/year
         java.time.LocalDate now = java.time.LocalDate.now();
-        int m = (month != null) ? month : now.getMonthValue();
-        int y = (year != null) ? year : now.getYear();
-        String filename = String.format("expenses-%s-%d.xlsx",
-                java.time.Month.of(m).toString().toLowerCase(), y);
+        LocalDate fStart = (start != null) ? start
+                : (month != null && year != null ? java.time.LocalDate.of(year, month, 1) : now.withDayOfMonth(1));
+        LocalDate fEnd = (end != null) ? end
+                : (month != null && year != null ? fStart.withDayOfMonth(fStart.lengthOfMonth()) : now.withDayOfMonth(now.lengthOfMonth()));
+        String filename = String.format("expenses-%s-to-%s.xlsx", fStart, fEnd);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)

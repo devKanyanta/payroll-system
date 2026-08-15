@@ -75,6 +75,10 @@ export default function Expenses() {
   const [form, setForm] = useState(emptyExpense);
   const [deleteId, setDeleteId] = useState(null);
   const [rejectDialog, setRejectDialog] = useState({ open: false, id: null, reason: '' });
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportStart, setExportStart] = useState('');
+  const [exportEnd, setExportEnd] = useState('');
+  const [exportStatus, setExportStatus] = useState('');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'error' });
   const queryClient = useQueryClient();
 
@@ -208,9 +212,14 @@ export default function Expenses() {
           <Button
             variant="outlined"
             startIcon={<FileDownload />}
-            onClick={() => expenseService.exportMonthExcel(selectedMonth + 1, selectedYear)}
+            onClick={() => {
+              setExportStart(start);
+              setExportEnd(end);
+              setExportStatus('');
+              setExportOpen(true);
+            }}
           >
-            Export {MONTHS[selectedMonth].label}
+            Export
           </Button>
           <Button variant="contained" startIcon={<Add />} onClick={openCreate}>
             Add Expense
@@ -257,7 +266,7 @@ export default function Expenses() {
                 select fullWidth label="Status" size="small"
                 value={statusFilter}
                 onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }}
-                SelectProps={{ native: true }}
+                slotProps={{ select: { native: true } }}
               >
                 <option value="">All Statuses</option>
                 <option value="PENDING">Pending</option>
@@ -420,6 +429,61 @@ export default function Expenses() {
           onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
         />
       </Card>
+
+      {/* Export Dialog */}
+      <Dialog open={exportOpen} onClose={() => setExportOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Export Expenses</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Choose the period and status to export to Excel.
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth label="From" type="date" size="small"
+                value={exportStart}
+                onChange={(e) => setExportStart(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth label="To" type="date" size="small"
+                value={exportEnd}
+                onChange={(e) => setExportEnd(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                select fullWidth label="Status" size="small"
+                value={exportStatus}
+                onChange={(e) => setExportStatus(e.target.value)}
+                slotProps={{ select: { native: true } }}
+              >
+                <option value="">All Statuses</option>
+                <option value="PENDING">Pending</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+              </TextField>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setExportOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            startIcon={<FileDownload />}
+            disabled={!exportStart || !exportEnd || exportEnd < exportStart}
+            onClick={() => {
+              expenseService.exportRangeExcel(exportStart, exportEnd, exportStatus);
+              setExportOpen(false);
+            }}
+          >
+            Export
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>

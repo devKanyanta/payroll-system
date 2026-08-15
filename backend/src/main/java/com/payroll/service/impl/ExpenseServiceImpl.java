@@ -25,6 +25,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
@@ -233,18 +234,20 @@ public class ExpenseServiceImpl implements ExpenseService {
     }
 
     @Override
-    public byte[] exportApprovedExpensesToExcel(Integer month, Integer year) {
-        // Determine which month/year to export
+    public byte[] exportExpensesToExcel(LocalDate start, LocalDate end, ExpenseStatus status) {
+        // Default to the current month when no range is provided
         LocalDate now = LocalDate.now();
-        int exportMonth = (month != null) ? month : now.getMonthValue();
-        int exportYear = (year != null) ? year : now.getYear();
+        if (start == null) start = now.withDayOfMonth(1);
+        if (end == null) end = now.withDayOfMonth(now.lengthOfMonth());
 
-        List<Expense> approvedExpenses = expenseRepository.findApprovedByMonth(exportMonth, exportYear);
+        List<Expense> expenses = (status != null)
+                ? expenseRepository.findByExpenseDateBetweenAndStatus(start, end, status)
+                : expenseRepository.findByExpenseDateBetween(start, end);
 
         try (Workbook workbook = new XSSFWorkbook();
              ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
 
-            Sheet sheet = workbook.createSheet("Approved Expenses");
+            Sheet sheet = workbook.createSheet("Expenses");
 
             // --- Styles ---
             CellStyle headerStyle = workbook.createCellStyle();
@@ -291,9 +294,13 @@ public class ExpenseServiceImpl implements ExpenseService {
             Row titleRow = sheet.createRow(0);
             titleRow.setHeightInPoints(24);
             Cell titleCell = titleRow.createCell(0);
-            java.time.Month expMonth = java.time.Month.of(exportMonth);
-            String monthName = expMonth.name().charAt(0) + expMonth.name().substring(1).toLowerCase();
-            titleCell.setCellValue("Approved Expenses — " + monthName + " " + exportYear);
+            String rangeLabel = start.format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
+                    + " to " + end.format(DateTimeFormatter.ofPattern("dd MMM yyyy"));
+            String title = "Expenses — " + rangeLabel;
+            if (status != null) {
+                title += " (" + status.name().charAt(0) + status.name().substring(1).toLowerCase() + ")";
+            }
+            titleCell.setCellValue(title);
             CellStyle titleStyle = workbook.createCellStyle();
             Font titleFont = workbook.createFont();
             titleFont.setBold(true);
@@ -305,10 +312,10 @@ public class ExpenseServiceImpl implements ExpenseService {
             titleStyle.setAlignment(HorizontalAlignment.CENTER);
             titleStyle.setVerticalAlignment(VerticalAlignment.CENTER);
             titleCell.setCellStyle(titleStyle);
-            sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(0, 0, 0, 6));
+            sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(0, 0, 0, 8));
 
             // --- Header row ---
-            String[] headers = {"S/N", "Item", "Amount (ZMW)", "Expense Date", "Submitted By", "Approved By", "Approved At"};
+            String[] headers = {"S/N", "Item", "Amount (ZMW)", "Expense Date", "Status", "Submitted By", "Approved By", "Approved At", "Rejection Reason"};
             Row headerRow = sheet.createRow(2);
             headerRow.setHeightInPoints(20);
             for (int i = 0; i < headers.length; i++) {
@@ -319,8 +326,8 @@ public class ExpenseServiceImpl implements ExpenseService {
 
             // --- Data rows ---
             int rowNum = 3;
-            for (int i = 0; i < approvedExpenses.size(); i++) {
-                Expense exp = approvedExpenses.get(i);
+            for (int i = 0; i < expenses.size(); i++) {
+                Expense exp = expenses.get(i);
                 Row row = sheet.createRow(rowNum++);
 
                 // S/N
@@ -343,14 +350,21 @@ public class ExpenseServiceImpl implements ExpenseService {
                 dateCell.setCellValue(exp.getExpenseDate());
                 dateCell.setCellStyle(dateStyle);
 
+                // Status
+                Cell statusCell = row.createCell(4);
+                statusCell.setCellValue(exp.getStatus() != null
+                        ? exp.getStatus().name().charAt(0) + exp.getStatus().name().substring(1).toLowerCase()
+                        : "");
+                statusCell.setCellStyle(textStyle);
+
                 // Submitted By
-                Cell submitterCell = row.createCell(4);
+                Cell submitterCell = row.createCell(5);
                 String submitterName = exp.getCreatedBy().getFirstName() + " " + exp.getCreatedBy().getLastName();
                 submitterCell.setCellValue(submitterName);
                 submitterCell.setCellStyle(textStyle);
 
                 // Approved By
-                Cell approverCell = row.createCell(5);
+                Cell approverCell = row.createCell(6);
                 if (exp.getApprovedBy() != null) {
                     approverCell.setCellValue(exp.getApprovedBy().getFirstName() + " " + exp.getApprovedBy().getLastName());
                 } else {
@@ -359,7 +373,7 @@ public class ExpenseServiceImpl implements ExpenseService {
                 approverCell.setCellStyle(textStyle);
 
                 // Approved At
-                Cell approvedAtCell = row.createCell(6);
+                Cell approvedAtCell = row.createCell(7);
                 if (exp.getApprovedAt() != null) {
                     approvedAtCell.setCellValue(exp.getApprovedAt());
                     CellStyle dateTimeStyle = workbook.createCellStyle();
@@ -375,10 +389,15 @@ public class ExpenseServiceImpl implements ExpenseService {
                     approvedAtCell.setCellValue("");
                     approvedAtCell.setCellStyle(textStyle);
                 }
+
+                // Rejection Reason
+                Cell rejectionCell = row.createCell(8);
+                rejectionCell.setCellValue(exp.getRejectionReason() != null ? exp.getRejectionReason() : "");
+                rejectionCell.setCellStyle(textStyle);
             }
 
-            // --- Summary row ---
-            if (!approvedExpenses.isEmpty()) {
+            // --- Summary rows ---
+            if (!expenses.isEmpty()) {
                 Row summaryRow = sheet.createRow(rowNum + 1);
                 Cell totalLabel = summaryRow.createCell(0);
                 totalLabel.setCellValue("TOTAL");
@@ -394,7 +413,7 @@ public class ExpenseServiceImpl implements ExpenseService {
 
                 summaryRow.createCell(1).setCellStyle(totalLabelStyle);
 
-                double totalAmount = approvedExpenses.stream()
+                double totalAmount = expenses.stream()
                         .mapToDouble(e -> e.getAmount().doubleValue())
                         .sum();
                 Cell totalValue = summaryRow.createCell(2);
@@ -417,26 +436,55 @@ public class ExpenseServiceImpl implements ExpenseService {
                 countLabel.setCellStyle(totalLabelStyle);
                 countRow.createCell(1).setCellStyle(totalLabelStyle);
                 Cell countValue = countRow.createCell(2);
-                countValue.setCellValue(approvedExpenses.size());
+                countValue.setCellValue(expenses.size());
                 CellStyle intBoldStyle = workbook.createCellStyle();
                 intBoldStyle.setFont(boldCurrencyFont);
                 intBoldStyle.setBorderTop(BorderStyle.DOUBLE);
                 intBoldStyle.setAlignment(HorizontalAlignment.RIGHT);
                 intBoldStyle.setVerticalAlignment(VerticalAlignment.CENTER);
                 countValue.setCellStyle(intBoldStyle);
+
+                // Per-status breakdown when exporting all statuses
+                if (status == null) {
+                    int breakdownRowNum = rowNum + 4;
+                    for (ExpenseStatus st : ExpenseStatus.values()) {
+                        double stTotal = expenses.stream()
+                                .filter(e -> e.getStatus() == st)
+                                .mapToDouble(e -> e.getAmount().doubleValue())
+                                .sum();
+                        long stCount = expenses.stream().filter(e -> e.getStatus() == st).count();
+                        Row stRow = sheet.createRow(breakdownRowNum++);
+                        Cell stLabel = stRow.createCell(0);
+                        stLabel.setCellValue(st.name().charAt(0) + st.name().substring(1).toLowerCase() + " Total:");
+                        stLabel.setCellStyle(totalLabelStyle);
+                        stRow.createCell(1).setCellStyle(totalLabelStyle);
+                        Cell stValue = stRow.createCell(2);
+                        stValue.setCellValue(stTotal);
+                        CellStyle stValueStyle = workbook.createCellStyle();
+                        stValueStyle.setFont(boldCurrencyFont);
+                        stValueStyle.setDataFormat(workbook.createDataFormat().getFormat("#,##0.00"));
+                        stValueStyle.setAlignment(HorizontalAlignment.RIGHT);
+                        stValueStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+                        stValue.setCellStyle(stValueStyle);
+                        Cell stCountCell = stRow.createCell(3);
+                        stCountCell.setCellValue(stCount == 0 ? "" : stCount + " item" + (stCount == 1 ? "" : "s"));
+                        stCountCell.setCellStyle(textStyle);
+                    }
+                }
             }
 
             // Auto-size columns
-            for (int i = 0; i < 7; i++) {
+            for (int i = 0; i < headers.length; i++) {
                 sheet.autoSizeColumn(i);
             }
             sheet.setColumnWidth(1, Math.max(sheet.getColumnWidth(1), 5000));
+            sheet.setColumnWidth(8, Math.max(sheet.getColumnWidth(8), 3000));
 
             workbook.write(bos);
             return bos.toByteArray();
 
         } catch (Exception e) {
-            throw new RuntimeException("Failed to export approved expenses to Excel", e);
+            throw new RuntimeException("Failed to export expenses to Excel", e);
         }
     }
 }

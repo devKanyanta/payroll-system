@@ -24,6 +24,10 @@ public interface ExpenseRepository extends JpaRepository<Expense, UUID> {
 
     Page<Expense> findByExpenseDateBetweenAndStatusAndCreatedById(LocalDate start, LocalDate end, ExpenseStatus status, UUID createdById, Pageable pageable);
 
+    List<Expense> findByExpenseDateBetween(LocalDate start, LocalDate end);
+
+    List<Expense> findByExpenseDateBetweenAndStatus(LocalDate start, LocalDate end, ExpenseStatus status);
+
     List<Expense> findByStatus(ExpenseStatus status);
 
     @Query("SELECT COALESCE(SUM(e.amount), 0) FROM Expense e WHERE " +

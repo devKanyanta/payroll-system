@@ -16,5 +16,5 @@ public interface ExpenseService {
     void deleteExpense(UUID id, UUID userId);
     Expense approveExpense(UUID id, UUID userId);
     Expense rejectExpense(UUID id, UUID userId, String reason);
-    byte[] exportApprovedExpensesToExcel(Integer month, Integer year);
+    byte[] exportExpensesToExcel(LocalDate start, LocalDate end, ExpenseStatus status);
 }
