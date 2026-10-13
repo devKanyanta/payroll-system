@@ -366,12 +366,12 @@ export default function Cashflow() {
         </CardContent>
       </Card>
 
-      {/* ── Payroll Cost by Site (calculated from payroll entries) ── */}
-      {summary?.payrollSites?.length > 0 && (
-        <Card sx={{ mb: 3 }}>
+      {/* ── Payroll Cashflow Summary (calculated from payroll entries) ── */}
+      {summary && summary.sites && summary.sites.length > 0 && (
+        <Card>
           <CardContent sx={{ p: 3 }}>
             <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-              Payroll Cost by Site
+              Cashflow Summary
               <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
                 (calculated from this month's payroll entries)
               </Typography>
@@ -386,53 +386,6 @@ export default function Cashflow() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {summary.payrollSites.map((site) => (
-                    <TableRow key={site.site} hover>
-                      <TableCell>
-                        <Typography variant="body2">{site.site}</Typography>
-                      </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" fontWeight={700} sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                          {formatCurrency(site.subTotal)}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  <TableRow>
-                    <TableCell align="right" sx={{ fontWeight: 700, borderTop: '2px solid' }}>
-                      Total Employee Gross Pay
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700, borderTop: '2px solid' }}>
-                      <Typography variant="body1" fontWeight={800} color="warning.main">
-                        {formatCurrency(summary.totalPayrollCost)}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ── Cashflow Summary Table ── */}
-      {summary && summary.sites && summary.sites.length > 0 && (
-        <Card>
-          <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
-              Cashflow Summary
-            </Typography>
-
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 700 }}>Item</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>Before VAT (ZMW)</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700 }}>After VAT (ZMW)</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
                   {summary.sites.map((site) => (
                     <TableRow key={site.site} hover>
                       <TableCell>
@@ -443,38 +396,27 @@ export default function Cashflow() {
                           {formatCurrency(site.subTotal)}
                         </Typography>
                       </TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" fontWeight={600} sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                          {formatCurrency(site.total)}
-                        </Typography>
-                      </TableCell>
                     </TableRow>
                   ))}
                   <TableRow>
                     <TableCell sx={{ fontWeight: 700, borderTop: '2px solid' }}>
-                      Total Sub Monthly Accumulated
+                      Total Payroll Cost
                     </TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700, borderTop: '2px solid' }}>
-                      <Typography variant="body1" fontWeight={800} color="primary.main">
-                        {formatCurrency(summary.totalSubMonthlyAccumulated)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700, borderTop: '2px solid' }}>
-                      <Typography variant="body1" fontWeight={800} color="primary.main">
-                        {formatCurrency(summary.totalAfterVat)}
+                      <Typography variant="body1" fontWeight={800} color="warning.main">
+                        {formatCurrency(summary.totalPayrollCost)}
                       </Typography>
                     </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell>
-                      <Typography variant="body2" fontWeight={600}>Employee Gross Pay</Typography>
+                      <Typography variant="body2" fontWeight={600}>Total Revenue (Before VAT)</Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <Typography variant="body2" fontWeight={600} color="warning.main">
-                        {formatCurrency(summary.employeeGrossPay)}
+                      <Typography variant="body2" fontWeight={600} color="primary.main">
+                        {formatCurrency(summary.totalSubMonthlyAccumulated)}
                       </Typography>
                     </TableCell>
-                    <TableCell />
                   </TableRow>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 700, borderTop: '2px solid' }}>
@@ -485,7 +427,6 @@ export default function Cashflow() {
                         {formatCurrency(summary.companyProfit)}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={{ borderTop: '2px solid' }} />
                   </TableRow>
                 </TableBody>
               </Table>

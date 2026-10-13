@@ -1015,8 +1015,8 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                     // Merge across first 4 columns
                     sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(cashflowStartRow, cashflowStartRow, 0, 4));
 
-                    // Cashflow headers (row below the title)
-                    String[] cfHeaders = {"Site", "Sub Total", "VAT @ 16%", "Total"};
+                    // Cashflow headers (row below the title) — sites are payroll-calculated
+                    String[] cfHeaders = {"Site", "Payroll Cost (ZMW)"};
                     Row cfHeaderRow2 = sheet.createRow(cashflowStartRow + 1);
                     cfHeaderRow2.setHeightInPoints(20);
                     for (int i = 0; i < cfHeaders.length; i++) {
@@ -1036,17 +1036,9 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                         siteCell.setCellValue(site.getSite());
                         siteCell.setCellStyle(textStyle);
 
-                        Cell subTotalCell = row.createCell(1);
-                        subTotalCell.setCellValue(site.getSubTotal().doubleValue());
-                        subTotalCell.setCellStyle(currencyStyle);
-
-                        Cell vatCell = row.createCell(2);
-                        vatCell.setCellValue(site.getVatAmount().doubleValue());
-                        vatCell.setCellStyle(currencyStyle);
-
-                        Cell totalCell = row.createCell(3);
-                        totalCell.setCellValue(site.getTotal().doubleValue());
-                        totalCell.setCellStyle(currencyStyle);
+                        Cell costCell = row.createCell(1);
+                        costCell.setCellValue(site.getSubTotal().doubleValue());
+                        costCell.setCellStyle(currencyStyle);
 
                         grandTotal = grandTotal.add(site.getSubTotal());
                     }
@@ -1056,13 +1048,10 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                     cfTotalRow.setHeightInPoints(20);
 
                     Cell cfTotalLabel = cfTotalRow.createCell(0);
-                    cfTotalLabel.setCellValue("Total Sub Monthly Accumulated");
+                    cfTotalLabel.setCellValue("Total Payroll Cost");
                     cfTotalLabel.setCellStyle(totalRowLabelStyle);
 
-                    cfTotalRow.createCell(1).setCellStyle(totalRowLabelStyle);
-                    cfTotalRow.createCell(2).setCellStyle(totalRowLabelStyle);
-
-                    Cell cfTotalValue = cfTotalRow.createCell(3);
+                    Cell cfTotalValue = cfTotalRow.createCell(1);
                     cfTotalValue.setCellValue(grandTotal.doubleValue());
                     cfTotalValue.setCellStyle(totalRowValueStyle);
 
@@ -1078,29 +1067,6 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                     boldLabelStyle.setAlignment(HorizontalAlignment.LEFT);
                     boldLabelStyle.setVerticalAlignment(VerticalAlignment.CENTER);
 
-                    // Per-site employee cost, calculated from payroll entries
-                    if (cashflow.getPayrollSites() != null && !cashflow.getPayrollSites().isEmpty()) {
-                        cfRowNum++;
-                        Row costHeaderRow = sheet.createRow(cfRowNum);
-                        Cell costHeaderCell = costHeaderRow.createCell(0);
-                        costHeaderCell.setCellValue("Employee Gross Pay by Site:");
-                        costHeaderCell.setCellStyle(boldLabelStyle);
-                        cfRowNum++;
-
-                        for (CashflowSummaryResponse.SiteRevenue ps : cashflow.getPayrollSites()) {
-                            Row costRow = sheet.createRow(cfRowNum++);
-                            costRow.setHeightInPoints(18);
-
-                            Cell siteCell = costRow.createCell(0);
-                            siteCell.setCellValue("Payroll cost — " + ps.getSite());
-                            siteCell.setCellStyle(boldLabelStyle);
-
-                            Cell costCell = costRow.createCell(1);
-                            costCell.setCellValue(ps.getSubTotal().doubleValue());
-                            costCell.setCellStyle(currencyStyle);
-                        }
-                    }
-
                     // Employee Gross Pay row
                     cfRowNum++;
                     Row grossPayRow = sheet.createRow(cfRowNum);
@@ -1110,10 +1076,7 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                     grossPayLabel.setCellValue("Employee Gross Pay:");
                     grossPayLabel.setCellStyle(boldLabelStyle);
 
-                    grossPayRow.createCell(1).setCellStyle(boldLabelStyle);
-                    grossPayRow.createCell(2).setCellStyle(boldLabelStyle);
-
-                    Cell grossPayValue = grossPayRow.createCell(3);
+                    Cell grossPayValue = grossPayRow.createCell(1);
                     grossPayValue.setCellValue(cashflow.getEmployeeGrossPay().doubleValue());
                     grossPayValue.setCellStyle(currencyStyle);
 
@@ -1126,10 +1089,7 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                     profitLabel.setCellValue("Company Profit:");
                     profitLabel.setCellStyle(totalRowLabelStyle);
 
-                    profitRow.createCell(1).setCellStyle(totalRowLabelStyle);
-                    profitRow.createCell(2).setCellStyle(totalRowLabelStyle);
-
-                    Cell profitValue = profitRow.createCell(3);
+                    Cell profitValue = profitRow.createCell(1);
                     profitValue.setCellValue(cashflow.getCompanyProfit().doubleValue());
                     CellStyle profitValueStyle = workbook.createCellStyle();
                     Font profitFont = workbook.createFont();

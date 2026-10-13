@@ -192,10 +192,14 @@ public class CashflowServiceImpl implements CashflowService {
             }
         }
 
+        // The sites breakdown is now CALCULATED from the payroll (per-site employee
+        // cost), not taken from imported/manual revenue rows. The revenue fields
+        // (totalSubMonthlyAccumulated / totalAfterVat / companyProfit) still come
+        // from cashflow_revenues, which is maintained on the Cashflow page.
         return CashflowSummaryResponse.builder()
                 .month(month)
                 .year(year)
-                .sites(siteRevenues)
+                .sites(payrollSites)
                 .totalSubMonthlyAccumulated(totalSubMonthly)
                 .totalAfterVat(totalAfterVat)
                 .employeeGrossPay(employeeGrossPay)

@@ -653,8 +653,7 @@ function CompanyCashflow({ cashflow, isLoading }) {
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary' }}>Site</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary' }}>Sub Total</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary' }}>Total</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 600, fontSize: '0.75rem', color: 'text.secondary' }}>Payroll Cost</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -664,27 +663,7 @@ function CompanyCashflow({ cashflow, isLoading }) {
                     <Typography variant="body2" fontWeight={500}>{site.site}</Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {formatCurrency(site.subTotal)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
                     <Typography variant="body2" fontWeight={600} sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                      {formatCurrency(site.total)}
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {(cashflow.payrollSites || []).map((site) => (
-                <TableRow key={'payroll-' + site.site}>
-                  <TableCell>
-                    <Typography variant="body2" color="text.secondary">
-                      {site.site} — payroll cost
-                    </Typography>
-                  </TableCell>
-                  <TableCell />
-                  <TableCell align="right">
-                    <Typography variant="body2" color="warning.main" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                       {formatCurrency(site.subTotal)}
                     </Typography>
                   </TableCell>
