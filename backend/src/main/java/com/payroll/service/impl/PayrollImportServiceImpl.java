@@ -387,12 +387,17 @@ public class PayrollImportServiceImpl implements PayrollImportService {
 
         List<PayrollImport> imports = payrollImportRepository
                 .findByPayrollRunIdOrderByCreatedAtDesc(runOpt.get().getId());
-        if (imports.isEmpty()
-                || imports.get(0).getStatus() != ImportStatus.IMPORTED) {
-            log.info("No processed payroll import for {}/{} — skipping cashflow resync", month, year);
+        if (imports.isEmpty()) {
+            log.info("No payroll import for {}/{} — skipping cashflow resync", month, year);
             return false;
         }
+
+        // Use the newest stored file regardless of processing status — the file
+        // content is what matters for the cashflow section, and this lets a
+        // re-upload be picked up by 'Recalculate' without a full re-process.
         PayrollImport source = imports.get(0);
+        log.info("Resyncing cashflow rows for {}/{} from stored import '{}' (status {})",
+                month, year, source.getFileName(), source.getStatus());
 
         try (InputStream is = fileStorageService.loadFile(source.getFilePath()).getInputStream();
              Workbook workbook = new XSSFWorkbook(is)) {
@@ -692,6 +697,8 @@ public class PayrollImportServiceImpl implements PayrollImportService {
                     .build();
 
             cashflowRevenueRepository.save(revenue);
+            log.info("Cashflow parsed: '{}' → subTotal={}, vat={}, total={}",
+                    site, subTotal, vatAmount, total);
         }
 
         log.info("Successfully imported cashflow data for {}/{}, {} sites, from payroll Excel",
