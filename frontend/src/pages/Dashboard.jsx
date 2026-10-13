@@ -675,6 +675,21 @@ function CompanyCashflow({ cashflow, isLoading }) {
                   </TableCell>
                 </TableRow>
               ))}
+              {(cashflow.payrollSites || []).map((site) => (
+                <TableRow key={'payroll-' + site.site}>
+                  <TableCell>
+                    <Typography variant="body2" color="text.secondary">
+                      {site.site} — payroll cost
+                    </Typography>
+                  </TableCell>
+                  <TableCell />
+                  <TableCell align="right">
+                    <Typography variant="body2" color="warning.main" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                      {formatCurrency(site.subTotal)}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </TableContainer>

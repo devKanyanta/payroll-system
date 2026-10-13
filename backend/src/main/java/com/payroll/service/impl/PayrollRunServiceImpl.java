@@ -1078,6 +1078,29 @@ public class PayrollRunServiceImpl implements PayrollRunService {
                     boldLabelStyle.setAlignment(HorizontalAlignment.LEFT);
                     boldLabelStyle.setVerticalAlignment(VerticalAlignment.CENTER);
 
+                    // Per-site employee cost, calculated from payroll entries
+                    if (cashflow.getPayrollSites() != null && !cashflow.getPayrollSites().isEmpty()) {
+                        cfRowNum++;
+                        Row costHeaderRow = sheet.createRow(cfRowNum);
+                        Cell costHeaderCell = costHeaderRow.createCell(0);
+                        costHeaderCell.setCellValue("Employee Gross Pay by Site:");
+                        costHeaderCell.setCellStyle(boldLabelStyle);
+                        cfRowNum++;
+
+                        for (CashflowSummaryResponse.SiteRevenue ps : cashflow.getPayrollSites()) {
+                            Row costRow = sheet.createRow(cfRowNum++);
+                            costRow.setHeightInPoints(18);
+
+                            Cell siteCell = costRow.createCell(0);
+                            siteCell.setCellValue("Payroll cost — " + ps.getSite());
+                            siteCell.setCellStyle(boldLabelStyle);
+
+                            Cell costCell = costRow.createCell(1);
+                            costCell.setCellValue(ps.getSubTotal().doubleValue());
+                            costCell.setCellStyle(currencyStyle);
+                        }
+                    }
+
                     // Employee Gross Pay row
                     cfRowNum++;
                     Row grossPayRow = sheet.createRow(cfRowNum);

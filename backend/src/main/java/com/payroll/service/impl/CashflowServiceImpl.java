@@ -174,6 +174,24 @@ public class CashflowServiceImpl implements CashflowService {
 
         BigDecimal companyProfit = totalSubMonthly.subtract(employeeGrossPay);
 
+        // Per-site employee cost, CALCULATED from this month's payroll entries
+        // (sum of regular + overtime + holiday amounts = gross salary, grouped by
+        // each entry's site — not taken from an import/manual revenue section).
+        List<CashflowSummaryResponse.SiteRevenue> payrollSites = new ArrayList<>();
+        if (currentRun.isPresent()) {
+            List<Object[]> siteCosts = payrollEntryRepository
+                    .sumGrossSalaryByRunIdGroupedBySite(currentRun.get().getId());
+            for (Object[] row : siteCosts) {
+                String site = (String) row[0];
+                BigDecimal cost = row[1] != null ? (BigDecimal) row[1] : BigDecimal.ZERO;
+                payrollSites.add(CashflowSummaryResponse.SiteRevenue.builder()
+                        .site(site)
+                        .subTotal(cost)
+                        .total(cost)
+                        .build());
+            }
+        }
+
         return CashflowSummaryResponse.builder()
                 .month(month)
                 .year(year)
@@ -182,6 +200,8 @@ public class CashflowServiceImpl implements CashflowService {
                 .totalAfterVat(totalAfterVat)
                 .employeeGrossPay(employeeGrossPay)
                 .companyProfit(companyProfit)
+                .payrollSites(payrollSites)
+                .totalPayrollCost(employeeGrossPay)
                 .build();
     }
 

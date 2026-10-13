@@ -19,6 +19,12 @@ public interface PayrollEntryRepository extends JpaRepository<PayrollEntry, UUID
     @Query("SELECT COALESCE(SUM(pe.grossSalary), 0) FROM PayrollEntry pe WHERE pe.payrollRun.id = :runId")
     BigDecimal sumGrossSalaryByRunId(@Param("runId") UUID runId);
 
+    /** Per-site employee cost, calculated from this run's payroll entries grouped by site. */
+    @Query("SELECT pe.site, COALESCE(SUM(pe.grossSalary), 0) FROM PayrollEntry pe " +
+           "WHERE pe.payrollRun.id = :runId AND pe.site IS NOT NULL " +
+           "GROUP BY pe.site ORDER BY pe.site")
+    List<Object[]> sumGrossSalaryByRunIdGroupedBySite(@Param("runId") UUID runId);
+
     @Query("SELECT COALESCE(SUM(pe.netSalary), 0) FROM PayrollEntry pe WHERE pe.payrollRun.id = :runId")
     BigDecimal sumNetSalaryByRunId(@Param("runId") UUID runId);
 

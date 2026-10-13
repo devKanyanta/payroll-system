@@ -22,6 +22,12 @@ public class CashflowSummaryResponse {
     private BigDecimal employeeGrossPay;
     private BigDecimal companyProfit;
 
+    /** Per-site employee cost, calculated from the month's payroll entries. */
+    private List<SiteRevenue> payrollSites;
+
+    /** Total of payrollSites — equals employeeGrossPay. */
+    private BigDecimal totalPayrollCost;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
