@@ -119,6 +119,7 @@ public class PayrollImportServiceImpl implements PayrollImportService {
             List<String> validationErrors = new ArrayList<>();
             List<RowData> validRows = new ArrayList<>();
             int totalRows = 0;
+            Set<UUID> employeesSeenInFile = new HashSet<>();
 
             for (int i = 3; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
@@ -168,6 +169,16 @@ public class PayrollImportServiceImpl implements PayrollImportService {
                 if (payrollEntryRepository.findByPayrollRunIdAndEmployeeId(payrollRun.getId(), employee.getId()).isPresent()) {
                     validationErrors.add(String.format(
                             "Row %d: Employee '%s %s' (#%s) already has an entry in this payroll run",
+                            excelRowNum, employee.getFirstName(), employee.getLastName(), employee.getEmployeeNumber()));
+                    continue;
+                }
+
+                // Guard against the same employee appearing on more than one row of the
+                // spreadsheet — otherwise two inserts for the same
+                // (payroll_run_id, employee_id) violate the unique constraint mid-import.
+                if (!employeesSeenInFile.add(employee.getId())) {
+                    validationErrors.add(String.format(
+                            "Row %d: Duplicate row in spreadsheet — Employee '%s %s' (#%s) matches an earlier row in this file",
                             excelRowNum, employee.getFirstName(), employee.getLastName(), employee.getEmployeeNumber()));
                     continue;
                 }
