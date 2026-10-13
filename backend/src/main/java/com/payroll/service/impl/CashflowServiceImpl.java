@@ -9,6 +9,7 @@ import com.payroll.repository.CashflowRevenueRepository;
 import com.payroll.repository.PayrollEntryRepository;
 import com.payroll.repository.PayrollRunRepository;
 import com.payroll.service.CashflowService;
+import com.payroll.service.PayrollImportService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class CashflowServiceImpl implements CashflowService {
     private final CashflowRevenueRepository cashflowRevenueRepository;
     private final PayrollRunRepository payrollRunRepository;
     private final PayrollEntryRepository payrollEntryRepository;
+    private final PayrollImportService payrollImportService;
 
     private static final List<String> DEFAULT_SITES = List.of(
             "Kitwe Invoice", "Mufulira Smelter", "Mufulira Mining", "Chingola", "Mufulira shut down"
@@ -119,6 +121,14 @@ public class CashflowServiceImpl implements CashflowService {
     @Override
     @Transactional
     public List<CashflowRevenue> recalculateTotals(int month, int year) {
+        // First, re-sync the revenue rows from the stored payroll spreadsheet for
+        // this month (fixes stale rows imported by an older parser), then recompute
+        // VAT/totals over whatever rows are stored now.
+        boolean resynced = payrollImportService.resyncCashflowFromImport(month, year);
+        if (resynced) {
+            log.info("Cashflow revenue rows for {}/{} re-synced from the stored payroll import", month, year);
+        }
+
         List<CashflowRevenue> revenues = cashflowRevenueRepository.findByMonthAndYearOrderBySiteAsc(month, year);
 
         for (CashflowRevenue rev : revenues) {

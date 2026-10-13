@@ -377,6 +377,42 @@ public class PayrollImportServiceImpl implements PayrollImportService {
     }
 
     @Override
+    @Transactional
+    public boolean resyncCashflowFromImport(int month, int year) {
+        var runOpt = payrollRunRepository.findByMonthAndYear(month, year);
+        if (runOpt.isEmpty()) {
+            log.info("No payroll run for {}/{} — nothing to resync cashflow from", month, year);
+            return false;
+        }
+
+        List<PayrollImport> imports = payrollImportRepository
+                .findByPayrollRunIdOrderByCreatedAtDesc(runOpt.get().getId());
+        if (imports.isEmpty()
+                || imports.get(0).getStatus() != ImportStatus.IMPORTED) {
+            log.info("No processed payroll import for {}/{} — skipping cashflow resync", month, year);
+            return false;
+        }
+        PayrollImport source = imports.get(0);
+
+        try (InputStream is = fileStorageService.loadFile(source.getFilePath()).getInputStream();
+             Workbook workbook = new XSSFWorkbook(is)) {
+
+            Sheet sheet = workbook.getSheet("PAYROLL");
+            if (sheet == null) {
+                sheet = workbook.getSheetAt(0);
+            }
+
+            parseAndSaveCashflowSection(sheet, runOpt.get());
+            return true;
+
+        } catch (Exception e) {
+            log.warn("Could not resync cashflow rows from import '{}' for {}/{}: {}",
+                    source.getFileName(), month, year, e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
     public PayrollImport getImportById(UUID id) {
         return payrollImportRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("PayrollImport", id));
