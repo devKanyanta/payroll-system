@@ -119,7 +119,11 @@ public class PayrollImportServiceImpl implements PayrollImportService {
             List<String> validationErrors = new ArrayList<>();
             List<RowData> validRows = new ArrayList<>();
             int totalRows = 0;
-            Set<UUID> employeesSeenInFile = new HashSet<>();
+            // Guards against two different file rows resolving to the *same* database
+            // employee record (usually a shared NRC or duplicated employee number).
+            // Without this, both rows would insert PayrollEntries with identical
+            // (payroll_run_id, employee_id) and violate the unique constraint.
+            Map<UUID, Integer> employeesSeenInFile = new HashMap<>();
 
             for (int i = 3; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
@@ -176,10 +180,13 @@ public class PayrollImportServiceImpl implements PayrollImportService {
                 // Guard against the same employee appearing on more than one row of the
                 // spreadsheet — otherwise two inserts for the same
                 // (payroll_run_id, employee_id) violate the unique constraint mid-import.
-                if (!employeesSeenInFile.add(employee.getId())) {
+                Integer firstRow = employeesSeenInFile.putIfAbsent(employee.getId(), excelRowNum);
+                if (firstRow != null) {
                     validationErrors.add(String.format(
-                            "Row %d: Duplicate row in spreadsheet — Employee '%s %s' (#%s) matches an earlier row in this file",
-                            excelRowNum, employee.getFirstName(), employee.getLastName(), employee.getEmployeeNumber()));
+                            "Row %d: resolves to the same database employee as Row %d — matched record '%s %s' (#%s). "
+                                    + "Check for a shared NRC or duplicated EMPLOYEE NUMBER between the two rows (one of them is wrong)",
+                            excelRowNum, firstRow,
+                            employee.getFirstName(), employee.getLastName(), employee.getEmployeeNumber()));
                     continue;
                 }
 
@@ -484,14 +491,18 @@ public class PayrollImportServiceImpl implements PayrollImportService {
      * to the cashflow_revenues table for the given payroll run's month/year.
      * <p>
      * Expected Excel layout (starting after employee data rows):
-     *   Row N:   "Company Cash Flow"           (header)
-     *   Row N+1: (blank)
-     *   Row N+2: [Site headers with amounts in adjacent columns]
-     *   Row N+3: "Sub Total" in col E, values in col F,H,J,M
-     *   Row N+4: "Vat @ 16%"  in col E, values in col F,H,J,M
-     *   Row N+5: "Total"      in col E, values in col F,H,J,M
+     *   Row N:   "Company Cash Flow"           (header, col E)
+     *   Row N+2: site name headers, each followed by an "Amount" label (last site's
+     *            name may sit directly on its amount column)
+     *   Row N+3: "Sub Total" labels, each immediately left of the site's amount
+     *   Row N+4: "Vat @ 16%"  labels, same columns
+     *   Row N+5: "Total"      labels, same columns
      * <p>
-     * Known sites: Kitwe Invoice, Mufulira Smelter, Mufulira Mining, Chingola
+     * Sites are discovered dynamically from the sheet: every "Sub Total" label
+     * marks a site block whose amount is the next cell to its right. This avoids
+     * hardcoding site names/columns (e.g. a temporary "Mufulira shut down" site
+     * would previously have been silently dropped, and a blind guess of column M
+     * read the "Sub Total" text as Chingola's amount → 0).
      */
     private void parseAndSaveCashflowSection(Sheet sheet, PayrollRun payrollRun) {
         // Scan for the "Company Cash Flow" header row
@@ -516,51 +527,98 @@ public class PayrollImportServiceImpl implements PayrollImportService {
         int month = payrollRun.getMonth();
         int year = payrollRun.getYear();
 
-        // Site amount column indices (0-based POI column index)
-        // The Excel layout places each site's numeric value in a dedicated column:
-        //   Kitwe Invoice       → Col F (idx 5)
-        //   Mufulira Smelter    → Col H (idx 7)
-        //   Mufulira Mining     → Col J (idx 9)
-        //   Chingola            → Col M (idx 12)
-        Map<String, Integer> siteAmountCols = new LinkedHashMap<>();
-        siteAmountCols.put("Kitwe Invoice", 5);
-        siteAmountCols.put("Mufulira Smelter", 7);
-        siteAmountCols.put("Mufulira Mining", 9);
-        siteAmountCols.put("Chingola", 12);
-
-        // Parse the three data rows: Sub Total, Vat, and Total
-        Map<String, BigDecimal> subTotals = new HashMap<>();
-        Map<String, BigDecimal> vatAmounts = new HashMap<>();
-        Map<String, BigDecimal> totals = new HashMap<>();
-
-        for (int i = headerRow + 2; i <= sheet.getLastRowNum(); i++) {
+        // Locate the Sub Total / Vat / Total rows (labels live in column E)
+        int subTotalRowIdx = -1, vatRowIdx = -1, totalRowIdx = -1;
+        int scanLimit = Math.min(headerRow + 6, sheet.getLastRowNum());
+        for (int i = headerRow + 1; i <= scanLimit; i++) {
             Row row = sheet.getRow(i);
             if (row == null) continue;
 
             String label = getCellStringValue(row.getCell(4)); // Column E
             if (label == null) continue;
+            String lower = label.toLowerCase();
 
-            if (label.equalsIgnoreCase("Sub Total")) {
-                for (Map.Entry<String, Integer> entry : siteAmountCols.entrySet()) {
-                    subTotals.put(entry.getKey(), getNumericCellValue(row.getCell(entry.getValue())));
-                }
-            } else if (label.toLowerCase().contains("vat")) {
-                for (Map.Entry<String, Integer> entry : siteAmountCols.entrySet()) {
-                    vatAmounts.put(entry.getKey(), getNumericCellValue(row.getCell(entry.getValue())));
-                }
-            } else if (label.equalsIgnoreCase("Total")) {
-                for (Map.Entry<String, Integer> entry : siteAmountCols.entrySet()) {
-                    totals.put(entry.getKey(), getNumericCellValue(row.getCell(entry.getValue())));
-                }
-            }
-            // Stop after processing all three data rows — they should be consecutive
-            if (!subTotals.isEmpty() && !vatAmounts.isEmpty() && !totals.isEmpty()) {
-                break;
+            if (lower.startsWith("sub total") && subTotalRowIdx == -1) {
+                subTotalRowIdx = i;
+            } else if (lower.contains("vat") && vatRowIdx == -1) {
+                vatRowIdx = i;
+            } else if (lower.equals("total") && totalRowIdx == -1) {
+                totalRowIdx = i;
             }
         }
 
+        if (subTotalRowIdx == -1) {
+            log.info("No 'Sub Total' row found below the Company Cash Flow header — skipping cashflow import");
+            return;
+        }
+
+        // Discover site blocks dynamically: each "Sub Total" label's amount lives
+        // in the cell immediately to its right.
+        Row subTotalRow = sheet.getRow(subTotalRowIdx);
+        List<Integer> amountCols = new ArrayList<>();
+        for (int c = 0; c < subTotalRow.getLastCellNum(); c++) {
+            String label = getCellStringValue(subTotalRow.getCell(c));
+            if (label != null && label.trim().equalsIgnoreCase("Sub Total")) {
+                amountCols.add(c + 1);
+            }
+        }
+        if (amountCols.isEmpty()) {
+            log.info("Cashflow section found but no site blocks detected — skipping save");
+            return;
+        }
+
+        // Site names come from the header row directly above the Sub Total row,
+        // in column order (skipping their own "Amount" labels), paired by index
+        // with the amount columns.
+        Row siteNameRow = sheet.getRow(subTotalRowIdx - 1);
+        List<String> siteNames = new ArrayList<>();
+        if (siteNameRow != null) {
+            for (int c = 0; c < siteNameRow.getLastCellNum(); c++) {
+                String label = getCellStringValue(siteNameRow.getCell(c));
+                if (label == null || label.trim().isEmpty()
+                        || label.trim().equalsIgnoreCase("Amount")) {
+                    continue;
+                }
+                siteNames.add(label.trim());
+            }
+        }
+        if (siteNames.size() != amountCols.size()) {
+            log.warn("Cashflow site header row has {} names for {} site blocks — cannot map sites reliably, skipping save",
+                    siteNames.size(), amountCols.size());
+            return;
+        }
+
+        // Parse each site block's values
+        int siteCount = amountCols.size();
+        List<BigDecimal> subTotals = new ArrayList<>();
+        List<BigDecimal> vatAmounts = new ArrayList<>();
+        List<BigDecimal> totals = new ArrayList<>();
+
+        for (int k = 0; k < siteCount; k++) {
+            int col = amountCols.get(k);
+            BigDecimal subTotal = getNumericCellValue(subTotalRow.getCell(col));
+
+            BigDecimal vatAmount;
+            BigDecimal total;
+            if (vatRowIdx != -1) {
+                vatAmount = getNumericCellValue(sheet.getRow(vatRowIdx).getCell(col));
+            } else {
+                vatAmount = subTotal.multiply(new BigDecimal("16.00"))
+                        .divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+            }
+            if (totalRowIdx != -1) {
+                total = getNumericCellValue(sheet.getRow(totalRowIdx).getCell(col));
+            } else {
+                total = subTotal.add(vatAmount);
+            }
+
+            subTotals.add(subTotal);
+            vatAmounts.add(vatAmount);
+            totals.add(total);
+        }
+
         // Only proceed if we found at least one non-zero value
-        boolean hasData = subTotals.values().stream().anyMatch(v -> v.compareTo(BigDecimal.ZERO) > 0);
+        boolean hasData = subTotals.stream().anyMatch(v -> v.compareTo(BigDecimal.ZERO) > 0);
         if (!hasData) {
             log.info("Cashflow section found but all values are zero — skipping save");
             return;
@@ -574,11 +632,11 @@ public class PayrollImportServiceImpl implements PayrollImportService {
         }
 
         // Save each site's revenue data
-        for (Map.Entry<String, Integer> entry : siteAmountCols.entrySet()) {
-            String site = entry.getKey();
-            BigDecimal subTotal = subTotals.getOrDefault(site, BigDecimal.ZERO);
-            BigDecimal vatAmount = vatAmounts.getOrDefault(site, BigDecimal.ZERO);
-            BigDecimal total = totals.getOrDefault(site, BigDecimal.ZERO);
+        for (int k = 0; k < siteCount; k++) {
+            String site = siteNames.get(k);
+            BigDecimal subTotal = subTotals.get(k);
+            BigDecimal vatAmount = vatAmounts.get(k);
+            BigDecimal total = totals.get(k);
 
             // Skip sites with no data
             if (subTotal.compareTo(BigDecimal.ZERO) == 0
@@ -600,7 +658,8 @@ public class PayrollImportServiceImpl implements PayrollImportService {
             cashflowRevenueRepository.save(revenue);
         }
 
-        log.info("Successfully imported cashflow data for {}/{} from payroll Excel", month, year);
+        log.info("Successfully imported cashflow data for {}/{}, {} sites, from payroll Excel",
+                month, year, siteCount);
     }
 
     private BigDecimal getNumericCellValue(Cell cell) {

@@ -30,7 +30,7 @@ public class CashflowServiceImpl implements CashflowService {
     private final PayrollEntryRepository payrollEntryRepository;
 
     private static final List<String> DEFAULT_SITES = List.of(
-            "Kitwe Invoice", "Mufulira Smelter", "Mufulira Mining", "Chingola"
+            "Kitwe Invoice", "Mufulira Smelter", "Mufulira Mining", "Chingola", "Mufulira shut down"
     );
 
     @Override

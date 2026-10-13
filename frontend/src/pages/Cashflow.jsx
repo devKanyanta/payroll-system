@@ -13,9 +13,7 @@ import {
 } from '@mui/icons-material';
 import { cashflowService } from '../services/cashflowService';
 import { useAuth } from '../contexts/AuthContext';
-import LoadingScreen from '../components/LoadingScreen';
-
-const SITES = ['Kitwe Invoice', 'Mufulira Smelter', 'Mufulira Mining', 'Chingola'];
+import LoadingScreen from '../components/LoadingScreen';  const SITES = ['Kitwe Invoice', 'Mufulira Smelter', 'Mufulira Mining', 'Chingola', 'Mufulira shut down'];
 
 const months = [
   { value: 1, label: 'January' }, { value: 2, label: 'February' },
